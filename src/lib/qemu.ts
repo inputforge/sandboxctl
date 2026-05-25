@@ -2,7 +2,6 @@ import { spawn } from 'child_process';
 import { openSync, existsSync } from 'fs';
 import { createConnection } from 'net';
 import type { PlatformConfig } from './platform.js';
-import type { PortForward } from './sandbox.js';
 
 export interface QemuStartOptions {
   platform: PlatformConfig;
@@ -11,13 +10,12 @@ export interface QemuStartOptions {
   sockPath: string;
   logPath: string;
   port: number;
-  ports: PortForward[];
   cpus: number;
   memory: string;
 }
 
 export function spawnQemu(opts: QemuStartOptions): void {
-  const { platform: pc, vmImgPath, seedImgPath, sockPath, logPath, port, ports, cpus, memory } = opts;
+  const { platform: pc, vmImgPath, seedImgPath, sockPath, logPath, port, cpus, memory } = opts;
 
   const args: string[] = [
     '-machine', pc.machine,
@@ -37,10 +35,7 @@ export function spawnQemu(opts: QemuStartOptions): void {
     args.push('-drive', `if=virtio,format=raw,file=${seedImgPath},readonly=on`);
   }
 
-  const extraForwards = ports
-    .map(f => `hostfwd=${f.protocol ?? 'tcp'}::${f.host}-:${f.guest}`)
-    .join(',');
-  const netdev = `user,id=net0,hostfwd=tcp::${port}-:22${extraForwards ? ',' + extraForwards : ''}`;
+  const netdev = `user,id=net0,hostfwd=tcp::${port}-:22`;
 
   args.push(
     '-netdev', netdev,

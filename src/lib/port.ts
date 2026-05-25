@@ -1,5 +1,4 @@
 import { createServer } from 'net';
-import type { PortForward } from './sandbox.js';
 
 function isPortFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -15,12 +14,4 @@ export async function findFreePort(start = 2222, end = 2299): Promise<number> {
     if (await isPortFree(port)) return port;
   }
   throw new Error(`No free port found in range ${start}–${end}`);
-}
-
-export async function validatePortsAreFree(ports: PortForward[]): Promise<void> {
-  for (const fwd of ports) {
-    if (!(await isPortFree(fwd.host))) {
-      throw new Error(`Host port ${fwd.host} is already in use`);
-    }
-  }
 }

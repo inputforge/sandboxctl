@@ -14,7 +14,7 @@ import { getPlatformConfig, getUbuntuImageName, getUbuntuImageUrl } from '../lib
 import { findSshPublicKey } from '../lib/ssh-key.js';
 import { buildInstallScript } from '../lib/installers.js';
 import { buildSeedImage } from '../lib/seed.js';
-import { findFreePort, validatePortsAreFree } from '../lib/port.js';
+import { findFreePort } from '../lib/port.js';
 import { spawnQemu, isVmRunning, sendMonitorCommand, waitForSockGone } from '../lib/qemu.js';
 import { send } from './send.js';
 
@@ -38,7 +38,6 @@ async function firstBoot(
   pc: ReturnType<typeof getPlatformConfig>,
   name: string
 ): Promise<void> {
-  await validatePortsAreFree(config.ports ?? []);
   const dir = sandboxDir();
   mkdirSync(dir, { recursive: true });
   mkdirSync(appDataDir, { recursive: true });
@@ -124,10 +123,7 @@ async function subsequentBoot(
       config.vm.cpus !== snapshot.vm.cpus ||
       config.vm.memory !== snapshot.vm.memory
     );
-    const portsChanged = snapshot &&
-      JSON.stringify(config.ports ?? []) !== JSON.stringify(snapshot.ports ?? []);
-
-    if (!snapshot || (!diskChanged && !vmChanged && !portsChanged)) {
+    if (!snapshot || (!diskChanged && !vmChanged)) {
       console.error(`Sandbox "${name}" is already running.`);
       process.exit(1);
     }
@@ -156,7 +152,6 @@ async function subsequentBoot(
 
   if (!snapshot) writeConfigSnapshot(config);
 
-  await validatePortsAreFree(config.ports ?? []);
   const port = await findFreePort();
   await bootAndWait(config, pc, name, port, false);
   writeConfigSnapshot(config);
@@ -173,7 +168,6 @@ async function bootAndWait(
   {
     const s = p.spinner();
     s.start('Booting VM...');
-    const ports = config.ports ?? [];
     spawnQemu({
       platform: pc,
       vmImgPath: vmImgPath(),
@@ -181,11 +175,10 @@ async function bootAndWait(
       sockPath: vmSockPath(),
       logPath: vmLogPath(),
       port,
-      ports,
       cpus: config.vm.cpus,
       memory: config.vm.memory,
     });
-    writeState({ port, startedAt: new Date().toISOString(), ports });
+    writeState({ port, startedAt: new Date().toISOString() });
     s.stop('VM booting in background.');
   }
 
@@ -215,10 +208,8 @@ async function bootAndWait(
     }
   }
 
-  const portLines = (config.ports ?? [])
-    .map(f => `  ${f.host} → guest:${f.guest} (${f.protocol ?? 'tcp'})`)
-    .join('\n');
-  const outroMsg = `Sandbox "${name}" is ready!\n  SSH: ssh -p ${port} ubuntu@localhost${portLines ? '\n  Ports:\n' + portLines : ''}`;
+  const exposedPorts = (config.ports ?? []).map(f => `${f.guest}/${f.protocol ?? 'tcp'}`).join(', ');
+  const outroMsg = `Sandbox "${name}" is ready!\n  SSH: ssh -p ${port} ubuntu@localhost${exposedPorts ? `\n  Exposed: ${exposedPorts}` : ''}`;
   p.outro(outroMsg);
 }
 

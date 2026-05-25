@@ -30,7 +30,6 @@ export interface SandboxConfig {
 export interface SandboxState {
   port: number;
   startedAt: string;
-  ports?: PortForward[];
 }
 
 export function readSandboxConfig(cwd: string = process.cwd()): SandboxConfig {

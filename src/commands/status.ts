@@ -1,6 +1,6 @@
 import { existsSync } from 'fs';
 import { sandboxDir, sandboxName, vmSockPath } from '../lib/paths.js';
-import { readState } from '../lib/sandbox.js';
+import { readState, readSandboxConfig } from '../lib/sandbox.js';
 import { isVmRunning } from '../lib/qemu.js';
 
 export async function status(): Promise<void> {
@@ -22,12 +22,10 @@ export async function status(): Promise<void> {
     console.log(`SSH:     ssh -p ${state.port} ubuntu@localhost`);
     const uptimeMs = Date.now() - new Date(state.startedAt).getTime();
     console.log(`Uptime:  ${formatUptime(uptimeMs)}`);
-    if (state.ports && state.ports.length > 0) {
-      const [first, ...rest] = state.ports;
-      console.log(`Ports:   ${first.host} → guest:${first.guest} (${first.protocol ?? 'tcp'})`);
-      for (const f of rest) {
-        console.log(`         ${f.host} → guest:${f.guest} (${f.protocol ?? 'tcp'})`);
-      }
+    const config = readSandboxConfig();
+    const exposed = config.ports ?? [];
+    if (exposed.length > 0) {
+      console.log(`Exposed: ${exposed.map(f => `${f.guest}/${f.protocol ?? 'tcp'}`).join(', ')}`);
     }
   }
 }
