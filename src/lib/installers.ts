@@ -1,43 +1,43 @@
-import type { PackageConfig } from './sandbox.js';
+import type { PackageConfig } from "./sandbox.js";
 
-type InstallerFn = (cfg: PackageConfig, ubuntuArch: 'arm64' | 'amd64') => string[];
+type InstallerFn = (
+  cfg: PackageConfig,
+  ubuntuArch: "arm64" | "amd64"
+) => string[];
 
 const installers: Record<string, InstallerFn> = {
-  nodejs({ version = '22' }) {
-    return [
-      `echo "==> Node.js ${version}.x via NodeSource..."`,
-      `curl -fsSL https://deb.nodesource.com/setup_${version}.x | bash -`,
-      `apt-get install -y nodejs`,
-      `echo "node: $(node --version)"`,
-    ];
-  },
-
-  bun({ version = 'latest' }, ubuntuArch) {
-    const linuxArch = ubuntuArch === 'arm64' ? 'aarch64' : 'x64';
-    const tag = version === 'latest' ? 'latest' : `bun-v${version}`;
-    const url = version === 'latest'
-      ? `https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${linuxArch}.zip`
-      : `https://github.com/oven-sh/bun/releases/download/${tag}/bun-linux-${linuxArch}.zip`;
+  bun({ version = "latest" }, ubuntuArch) {
+    const linuxArch = ubuntuArch === "arm64" ? "aarch64" : "x64";
+    const tag = version === "latest" ? "latest" : `bun-v${version}`;
+    const url =
+      version === "latest"
+        ? `https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${linuxArch}.zip`
+        : `https://github.com/oven-sh/bun/releases/download/${tag}/bun-linux-${linuxArch}.zip`;
     return [
       `echo "==> Bun ${version} (linux-${linuxArch})..."`,
       `curl -fsSL ${url} -o /tmp/bun.zip`,
       `python3 -c "import zipfile; zipfile.ZipFile('/tmp/bun.zip').extract('bun-linux-${linuxArch}/bun', '/tmp/')"`,
       `mv /tmp/bun-linux-${linuxArch}/bun /usr/local/bin/bun`,
-      `chmod +x /usr/local/bin/bun`,
+      "chmod +x /usr/local/bin/bun",
       `rm -rf /tmp/bun.zip /tmp/bun-linux-${linuxArch}`,
       `echo "bun: $(bun --version)"`,
     ];
   },
 
-  python() {
+  go({ version = "1.24.3" }, ubuntuArch) {
+    const goArch = ubuntuArch === "arm64" ? "arm64" : "amd64";
     return [
-      `echo "==> Python 3 (pip, venv, dev)..."`,
-      `apt-get install -y python3-pip python3-venv python3-dev`,
-      `echo "python: $(python3 --version)"`,
+      `echo "==> Go ${version} (linux-${goArch})..."`,
+      `curl -fsSL https://go.dev/dl/go${version}.linux-${goArch}.tar.gz -o /tmp/go.tar.gz`,
+      "rm -rf /usr/local/go",
+      "tar -C /usr/local -xzf /tmp/go.tar.gz",
+      "rm /tmp/go.tar.gz",
+      `echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh`,
+      `echo "go: $(/usr/local/go/bin/go version)"`,
     ];
   },
 
-  java({ version = '21' }) {
+  java({ version = "21" }) {
     return [
       `echo "==> OpenJDK ${version}..."`,
       `apt-get install -y openjdk-${version}-jdk`,
@@ -45,45 +45,51 @@ const installers: Record<string, InstallerFn> = {
     ];
   },
 
-  go({ version = '1.24.3' }, ubuntuArch) {
-    const goArch = ubuntuArch === 'arm64' ? 'arm64' : 'amd64';
+  nodejs({ version = "22" }) {
     return [
-      `echo "==> Go ${version} (linux-${goArch})..."`,
-      `curl -fsSL https://go.dev/dl/go${version}.linux-${goArch}.tar.gz -o /tmp/go.tar.gz`,
-      `rm -rf /usr/local/go`,
-      `tar -C /usr/local -xzf /tmp/go.tar.gz`,
-      `rm /tmp/go.tar.gz`,
-      `echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh`,
-      `echo "go: $(/usr/local/go/bin/go version)"`,
-    ];
-  },
-
-  ruby() {
-    return [
-      `echo "==> Ruby..."`,
-      `apt-get install -y ruby-full`,
-      `echo "ruby: $(ruby --version)"`,
+      `echo "==> Node.js ${version}.x via NodeSource..."`,
+      `curl -fsSL https://deb.nodesource.com/setup_${version}.x | bash -`,
+      "apt-get install -y nodejs",
+      `echo "node: $(node --version)"`,
     ];
   },
 
   php() {
     return [
       `echo "==> PHP..."`,
-      `apt-get install -y php php-cli php-fpm php-curl php-json php-mbstring php-xml php-zip`,
+      "apt-get install -y php php-cli php-fpm php-curl php-json php-mbstring php-xml php-zip",
       `echo "php: $(php --version | head -1)"`,
     ];
   },
 
-  swift({ version = '6.0.3' }, ubuntuArch) {
-    const archSuffix = ubuntuArch === 'arm64' ? 'ubuntu2404-aarch64' : 'ubuntu2404';
-    const tarSuffix = ubuntuArch === 'arm64' ? 'ubuntu24.04-aarch64' : 'ubuntu24.04';
+  python() {
+    return [
+      `echo "==> Python 3 (pip, venv, dev)..."`,
+      "apt-get install -y python3-pip python3-venv python3-dev",
+      `echo "python: $(python3 --version)"`,
+    ];
+  },
+
+  ruby() {
+    return [
+      `echo "==> Ruby..."`,
+      "apt-get install -y ruby-full",
+      `echo "ruby: $(ruby --version)"`,
+    ];
+  },
+
+  swift({ version = "6.0.3" }, ubuntuArch) {
+    const archSuffix =
+      ubuntuArch === "arm64" ? "ubuntu2404-aarch64" : "ubuntu2404";
+    const tarSuffix =
+      ubuntuArch === "arm64" ? "ubuntu24.04-aarch64" : "ubuntu24.04";
     return [
       `echo "==> Swift ${version} (${tarSuffix})..."`,
-      `apt-get install -y binutils git gnupg2 libc6-dev libcurl4-openssl-dev libedit2 libgcc-13-dev libpython3-dev libsqlite3-dev libstdc++-13-dev libxml2-dev libz3-dev pkg-config tzdata unzip zlib1g-dev`,
+      "apt-get install -y binutils git gnupg2 libc6-dev libcurl4-openssl-dev libedit2 libgcc-13-dev libpython3-dev libsqlite3-dev libstdc++-13-dev libxml2-dev libz3-dev pkg-config tzdata unzip zlib1g-dev",
       `curl -fsSL https://download.swift.org/swift-${version}-release/${archSuffix}/swift-${version}-RELEASE/swift-${version}-RELEASE-${tarSuffix}.tar.gz -o /tmp/swift.tar.gz`,
-      `tar -xzf /tmp/swift.tar.gz -C /opt`,
+      "tar -xzf /tmp/swift.tar.gz -C /opt",
       `mv /opt/swift-${version}-RELEASE-${tarSuffix} /opt/swift`,
-      `rm /tmp/swift.tar.gz`,
+      "rm /tmp/swift.tar.gz",
       `echo 'export PATH=$PATH:/opt/swift/usr/bin' > /etc/profile.d/swift.sh`,
       `echo "swift: $(/opt/swift/usr/bin/swift --version 2>&1 | head -1)"`,
     ];
@@ -92,26 +98,28 @@ const installers: Record<string, InstallerFn> = {
 
 export function buildInstallScript(
   packages: Record<string, PackageConfig>,
-  ubuntuArch: 'arm64' | 'amd64'
+  ubuntuArch: "arm64" | "amd64"
 ): string {
   const lines = [
-    '#!/bin/bash',
-    'set -euo pipefail',
-    'exec > /var/log/install-tools.log 2>&1',
-    '',
-    'apt-get update -qq',
-    '',
+    "#!/bin/bash",
+    "set -euo pipefail",
+    "exec > /var/log/install-tools.log 2>&1",
+    "",
+    "apt-get update -qq",
+    "",
   ];
 
   for (const [name, cfg] of Object.entries(packages)) {
-    if (cfg.enabled === false) continue;
+    if (cfg.enabled === false) {
+      continue;
+    }
     const builder = installers[name];
     if (!builder) {
       continue;
     }
-    lines.push(...builder(cfg, ubuntuArch), '');
+    lines.push(...builder(cfg, ubuntuArch), "");
   }
 
   lines.push('echo "==> Done."');
-  return lines.join('\n');
+  return lines.join("\n");
 }

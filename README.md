@@ -70,31 +70,29 @@ Running `create-sandbox init` generates this file interactively. You can also wr
   },
   "packages": {
     "nodejs": { "enabled": true, "version": "22" },
-    "bun":    { "enabled": false },
+    "bun": { "enabled": false },
     "python": { "enabled": true },
-    "go":     { "enabled": false }
+    "go": { "enabled": false }
   },
   "send": {
     "remotePath": "/home/ubuntu/my-project"
   },
-  "ports": [
-    { "host": 3000, "guest": 3000, "protocol": "tcp" }
-  ]
+  "ports": [{ "host": 3000, "guest": 3000, "protocol": "tcp" }]
 }
 ```
 
 ### Supported packages
 
-| Package | Versioned | Default |
-|---------|-----------|---------|
-| Node.js | yes | 22 |
-| Bun | yes | latest |
-| Python 3 | no | — |
-| Java (OpenJDK) | yes | 21 |
-| Go | yes | 1.24.3 |
-| Ruby | no | — |
-| PHP | no | — |
-| Swift | yes | 6.0.3 |
+| Package        | Versioned | Default |
+| -------------- | --------- | ------- |
+| Node.js        | yes       | 22      |
+| Bun            | yes       | latest  |
+| Python 3       | no        | —       |
+| Java (OpenJDK) | yes       | 21      |
+| Go             | yes       | 1.24.3  |
+| Ruby           | no        | —       |
+| PHP            | no        | —       |
+| Swift          | yes       | 6.0.3   |
 
 ### Port forwarding
 
@@ -102,13 +100,13 @@ Running `create-sandbox init` generates this file interactively. You can also wr
 
 ### Config change rules
 
-| Change | Action required |
-|--------|----------------|
-| `ubuntu` version | `destroy` + `start` |
-| `packages` | `destroy` + `start` |
-| `vm.disk` (grow only) | `stop` + `start` |
-| `vm.cpus` / `vm.memory` | `stop` + `start` |
-| `ports` / `send.remotePath` | `stop` + `start` |
+| Change                      | Action required     |
+| --------------------------- | ------------------- |
+| `ubuntu` version            | `destroy` + `start` |
+| `packages`                  | `destroy` + `start` |
+| `vm.disk` (grow only)       | `stop` + `start`    |
+| `vm.cpus` / `vm.memory`     | `stop` + `start`    |
+| `ports` / `send.remotePath` | `stop` + `start`    |
 
 ## File sync
 

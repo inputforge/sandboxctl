@@ -1,95 +1,126 @@
-import { spawn } from 'child_process';
-import { openSync, existsSync } from 'fs';
-import { createConnection } from 'net';
-import type { PlatformConfig } from './platform.js';
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { existsSync, openSync } from "node:fs";
+import { createConnection } from "node:net";
+import { setTimeout as sleep } from "node:timers/promises";
+
+import type { PlatformConfig } from "./platform.js";
 
 export interface QemuStartOptions {
+  cpus: number;
+  logPath: string;
+  memory: string;
   platform: PlatformConfig;
-  vmImgPath: string;
+  port: number;
   seedImgPath: string | null;
   sockPath: string;
-  logPath: string;
-  port: number;
-  cpus: number;
-  memory: string;
+  vmImgPath: string;
 }
 
 export function spawnQemu(opts: QemuStartOptions): void {
-  const { platform: pc, vmImgPath, seedImgPath, sockPath, logPath, port, cpus, memory } = opts;
+  const {
+    platform: pc,
+    vmImgPath,
+    seedImgPath,
+    sockPath,
+    logPath,
+    port,
+    cpus,
+    memory,
+  } = opts;
 
   const args: string[] = [
-    '-machine', pc.machine,
-    '-accel', pc.accel,
-    '-cpu', pc.cpuArg,
-    '-smp', String(cpus),
-    '-m', memory,
+    "-machine",
+    pc.machine,
+    "-accel",
+    pc.accel,
+    "-cpu",
+    pc.cpuArg,
+    "-smp",
+    String(cpus),
+    "-m",
+    memory,
   ];
 
   if (pc.firmware) {
-    args.push('-drive', `if=pflash,format=raw,readonly=on,file=${pc.firmware}`);
+    args.push("-drive", `if=pflash,format=raw,readonly=on,file=${pc.firmware}`);
   }
 
-  args.push('-drive', `if=virtio,format=qcow2,file=${vmImgPath}`);
+  args.push("-drive", `if=virtio,format=qcow2,file=${vmImgPath}`);
 
   if (seedImgPath) {
-    args.push('-drive', `if=virtio,format=raw,file=${seedImgPath},readonly=on`);
+    args.push("-drive", `if=virtio,format=raw,file=${seedImgPath},readonly=on`);
   }
 
   const netdev = `user,id=net0,hostfwd=tcp::${port}-:22`;
 
   args.push(
-    '-netdev', netdev,
-    '-device', 'virtio-net-pci,netdev=net0',
-    '-device', 'virtio-rng-pci',
-    '-monitor', `unix:${sockPath},server,nowait`,
-    '-nographic',
+    "-netdev",
+    netdev,
+    "-device",
+    "virtio-net-pci,netdev=net0",
+    "-device",
+    "virtio-rng-pci",
+    "-monitor",
+    `unix:${sockPath},server,nowait`,
+    "-nographic"
   );
 
-  const logFd = openSync(logPath, 'a');
+  const logFd = openSync(logPath, "a");
   const child = spawn(pc.qemuBin, args, {
     detached: true,
-    stdio: ['ignore', logFd, logFd],
+    stdio: ["ignore", logFd, logFd],
   });
   child.unref();
 }
 
-export function isVmRunning(sockPath: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (!existsSync(sockPath)) { resolve(false); return; }
-    const socket = createConnection(sockPath);
-    socket.on('connect', () => { socket.destroy(); resolve(true); });
-    socket.on('error', () => resolve(false));
-    socket.setTimeout(1000, () => { socket.destroy(); resolve(false); });
-  });
+export async function isVmRunning(sockPath: string): Promise<boolean> {
+  if (!existsSync(sockPath)) {
+    return false;
+  }
+  const socket = createConnection(sockPath);
+  socket.setTimeout(1000);
+  try {
+    await Promise.race([
+      once(socket, "connect"),
+      once(socket, "timeout").then(() => {
+        throw new Error("timeout");
+      }),
+    ]);
+    socket.destroy();
+    return true;
+  } catch {
+    socket.destroy();
+    return false;
+  }
 }
 
-export function sendMonitorCommand(sockPath: string, command: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const socket = createConnection(sockPath);
-    socket.on('connect', () => {
-      socket.write(command + '\n');
-      // Give QEMU a moment to process before closing
-      setTimeout(() => { socket.destroy(); resolve(); }, 300);
-    });
-    socket.on('error', reject);
-    socket.setTimeout(5000, () => {
-      socket.destroy();
-      reject(new Error('Monitor socket connection timed out'));
-    });
-  });
+export async function sendMonitorCommand(
+  sockPath: string,
+  command: string
+): Promise<void> {
+  const socket = createConnection(sockPath);
+  socket.setTimeout(5000);
+  await Promise.race([
+    once(socket, "connect"),
+    once(socket, "timeout").then(() => {
+      throw new Error("Monitor socket connection timed out");
+    }),
+  ]);
+  socket.write(`${command}\n`);
+  await sleep(300);
+  socket.destroy();
 }
 
-export function waitForSockGone(sockPath: string, timeoutMs = 30_000): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const poll = setInterval(() => {
-      if (!existsSync(sockPath)) {
-        clearInterval(poll);
-        resolve();
-      } else if (Date.now() - start > timeoutMs) {
-        clearInterval(poll);
-        reject(new Error('VM did not shut down within 30 seconds'));
-      }
-    }, 500);
-  });
+export async function waitForSockGone(
+  sockPath: string,
+  timeoutMs = 30_000
+): Promise<void> {
+  const start = Date.now();
+  while (existsSync(sockPath)) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("VM did not shut down within 30 seconds");
+    }
+    await sleep(500);
+  }
 }

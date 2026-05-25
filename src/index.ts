@@ -1,23 +1,24 @@
 #!/usr/bin/env node
-import { parse } from '@bomb.sh/args';
-import { init } from './commands/init.js';
-import { start } from './commands/start.js';
-import { stop } from './commands/stop.js';
-import { destroy } from './commands/destroy.js';
-import { status } from './commands/status.js';
-import { ssh } from './commands/ssh.js';
-import { send } from './commands/send.js';
-import { receive } from './commands/receive.js';
-import { forward } from './commands/forward.js';
+import { parse } from "@bomb.sh/args";
+
+import { destroy } from "./commands/destroy.js";
+import { forward } from "./commands/forward.js";
+import { init } from "./commands/init.js";
+import { receive } from "./commands/receive.js";
+import { send } from "./commands/send.js";
+import { ssh } from "./commands/ssh.js";
+import { start } from "./commands/start.js";
+import { status } from "./commands/status.js";
+import { stop } from "./commands/stop.js";
 
 const args = parse(process.argv.slice(2), {
-  boolean: ['help'],
-  alias: { h: 'help' },
+  alias: { h: "help" },
+  boolean: ["help"],
 });
 
 const command = args._[0] as string | undefined;
 
-if (args['help'] || !command) {
+if (args.help || !command) {
   console.log(`
 create-sandbox — Linux VM sandbox manager
 
@@ -39,8 +40,15 @@ Commands:
 }
 
 const commands: Record<string, () => Promise<void>> = {
-  init, start, stop, destroy, status, ssh, send, receive,
+  destroy,
   forward: () => forward(args._[1] as string | undefined),
+  init,
+  receive,
+  send,
+  ssh,
+  start,
+  status,
+  stop,
 };
 
 const handler = commands[command];
@@ -49,7 +57,9 @@ if (!handler) {
   process.exit(1);
 }
 
-handler().catch((err: unknown) => {
-  console.error(String(err));
+try {
+  await handler();
+} catch (error: unknown) {
+  console.error(String(error));
   process.exit(1);
-});
+}
