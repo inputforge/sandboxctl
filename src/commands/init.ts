@@ -74,7 +74,7 @@ async function collectVmResources(
     initialValue: String(existing?.vm.cpus ?? 4),
     message: "CPUs",
     validate: (v) =>
-      Number.isNaN(Number(v)) || Number(v) < 1
+      !Number.isInteger(Number(v)) || Number(v) < 1
         ? "Must be a positive integer"
         : undefined,
   });
