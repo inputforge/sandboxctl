@@ -1,6 +1,6 @@
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 
-import { log } from "@clack/prompts";
+import { spinner } from "@clack/prompts";
 
 import { buildInstallScript } from "../../installers.js";
 import { sandboxDir, vmLogPath } from "../../paths.js";
@@ -21,7 +21,7 @@ import {
 export function createLimaProvider(pc: PlatformConfig): VmProvider {
   return {
     destroy: (name) => {
-      deleteLimaInstance(name);
+      deleteLimaInstance(name, vmLogPath(name));
       rmSync(sandboxDir(), { force: true, recursive: true });
       return Promise.resolve();
     },
@@ -30,7 +30,7 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
 
     isRunning: (name) => Promise.resolve(isLimaRunning(name)),
 
-    start: (config, name, snapshot) => {
+    start: async (config, name, snapshot) => {
       checkLimactlInstalled();
 
       const instance = getLimaInstance(name);
@@ -67,27 +67,58 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
       mkdirSync(sandboxDir(), { recursive: true });
       writeLimaYaml(name, yaml);
 
-      log.step(
-        isFirstBoot
-          ? "Creating and provisioning sandbox (this may take a few minutes)..."
-          : "Starting sandbox..."
-      );
-      startLimaInstance(name, vmLogPath());
+      const label = isFirstBoot
+        ? "Creating and provisioning sandbox (this may take a few minutes)..."
+        : "Starting sandbox...";
+
+      const s = spinner();
+      s.start(label);
+
+      const logPath = vmLogPath();
+      const startedAt = Date.now();
+      const logTail = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+        const elapsedStr =
+          elapsed >= 60
+            ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s`
+            : `${elapsed}s`;
+        try {
+          const lines = readFileSync(logPath, "utf-8")
+            .trimEnd()
+            .split("\n")
+            .filter(Boolean);
+          const last = lines.at(-1);
+          const msg = last ? (last.match(/msg="([^"]+)"/u)?.[1] ?? last) : "";
+          s.message(`${label} [${elapsedStr}]\n  ${msg.slice(0, 100)}`);
+        } catch {
+          s.message(`${label} [${elapsedStr}]`);
+        }
+      }, 1000);
+
+      try {
+        await startLimaInstance(name, logPath);
+      } catch (error) {
+        clearInterval(logTail);
+        s.stop("Failed to start sandbox.");
+        throw error;
+      }
+      clearInterval(logTail);
 
       const started = getLimaInstance(name);
       if (!started) {
-        console.error("Lima instance did not start.");
+        s.stop("Lima instance did not start.");
         process.exit(1);
       }
 
-      return Promise.resolve({
+      s.stop(isFirstBoot ? "Sandbox provisioned." : "Sandbox started.");
+      return {
         host: "127.0.0.1",
         port: started.sshLocalPort,
-      });
+      };
     },
 
     stop: (name) => {
-      stopLimaInstance(name);
+      stopLimaInstance(name, vmLogPath(name));
       return Promise.resolve();
     },
   };

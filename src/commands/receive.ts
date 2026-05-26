@@ -37,12 +37,18 @@ export async function receive(): Promise<void> {
     console.log(`Receiving from ${remotePath}...`);
     execFileSync(
       "rsync",
-      ["-avz", "-e", sshTransport, `ubuntu@${state.host}:${remotePath}/`, "./"],
+      [
+        "-avz",
+        "-e",
+        sshTransport,
+        `${config.username}@${state.host}:${remotePath}/`,
+        "./",
+      ],
       { stdio: "inherit" }
     );
   } else {
     console.log(`Receiving from ${remotePath} (via tar)...`);
-    const sshCmd = `${sshTransport} ubuntu@${state.host}`;
+    const sshCmd = `${sshTransport} ${config.username}@${state.host}`;
     execSync(`${sshCmd} 'tar czf - -C ${remotePath} .' | tar xzf -`, {
       stdio: ["pipe", "inherit", "inherit"],
     });

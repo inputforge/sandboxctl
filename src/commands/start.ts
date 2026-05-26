@@ -3,6 +3,7 @@ import { intro, outro, spinner } from "@clack/prompts";
 import { readGlobalConfig } from "../lib/global-config.js";
 import { sandboxName } from "../lib/paths.js";
 import { getPlatformConfig } from "../lib/platform.js";
+import { checkPrerequisites } from "../lib/prereqs.js";
 import { getProvider } from "../lib/providers/index.js";
 import {
   readConfigSnapshot,
@@ -18,6 +19,7 @@ export async function start(): Promise<void> {
   const config = readSandboxConfig();
   const globalConfig = readGlobalConfig();
   const pc = getPlatformConfig();
+  checkPrerequisites(pc);
   const provider = getProvider(config, globalConfig, pc);
   const snapshot = readConfigSnapshot();
 
@@ -48,6 +50,6 @@ export async function start(): Promise<void> {
     .join(", ");
   const sshCommand = buildSshTransport({ identityFile, port });
   outro(
-    `Sandbox "${name}" is ready!\n  SSH: ${sshCommand} ubuntu@${host}${exposed ? `\n  Exposed: ${exposed}` : ""}`
+    `Sandbox "${name}" is ready!\n  SSH: ${sshCommand} ${config.username}@${host}${exposed ? `\n  Exposed: ${exposed}` : ""}`
   );
 }

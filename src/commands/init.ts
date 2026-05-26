@@ -1,9 +1,8 @@
-import { existsSync } from "node:fs";
-import { basename, join } from "node:path";
+import { userInfo } from "node:os";
+import { basename } from "node:path";
 
 import {
   cancel,
-  confirm,
   intro,
   isCancel,
   multiselect,
@@ -12,7 +11,10 @@ import {
   text,
 } from "@clack/prompts";
 
-import { writeSandboxConfig } from "../lib/sandbox.js";
+import {
+  readSandboxConfigOptional,
+  writeSandboxConfig,
+} from "../lib/sandbox.js";
 import type { SandboxConfig } from "../lib/sandbox.js";
 
 const VERSIONED_PACKAGES = new Set(["nodejs", "bun", "java", "go", "swift"]);
@@ -26,19 +28,32 @@ const PACKAGE_DEFAULTS: Record<string, string> = {
   swift: "6.0.3",
 };
 
+const ALL_PACKAGES = [
+  "nodejs",
+  "bun",
+  "python",
+  "java",
+  "go",
+  "ruby",
+  "php",
+  "swift",
+];
+
 function bail(): never {
   cancel("Cancelled.");
   process.exit(0);
 }
 
 async function collectPackageVersions(
-  selectedPackages: string[]
+  selectedPackages: string[],
+  existing: SandboxConfig | null
 ): Promise<SandboxConfig["packages"] | null> {
   const packages: SandboxConfig["packages"] = {};
   for (const pkg of selectedPackages) {
     if (VERSIONED_PACKAGES.has(pkg)) {
+      const existingVersion = existing?.packages[pkg]?.version;
       const ver = await text({
-        initialValue: PACKAGE_DEFAULTS[pkg] ?? "latest",
+        initialValue: existingVersion ?? PACKAGE_DEFAULTS[pkg] ?? "latest",
         message: `${pkg} version`,
       });
       if (isCancel(ver)) {
@@ -52,8 +67,55 @@ async function collectPackageVersions(
   return packages;
 }
 
-async function collectEc2Config(): Promise<SandboxConfig["ec2"] | null> {
+async function collectVmResources(
+  existing: SandboxConfig | null
+): Promise<SandboxConfig["vm"] | null> {
+  const cpusRaw = await text({
+    initialValue: String(existing?.vm.cpus ?? 4),
+    message: "CPUs",
+    validate: (v) =>
+      !Number.isInteger(Number(v)) || Number(v) < 1
+        ? "Must be a positive integer"
+        : undefined,
+  });
+  if (isCancel(cpusRaw)) {
+    return null;
+  }
+
+  const memory = await text({
+    initialValue: existing?.vm.memory ?? "4G",
+    message: "Memory",
+    placeholder: "4G",
+    validate: (v) =>
+      SIZE_RE.test(v ?? "") ? undefined : "Format: e.g. 4G or 2048M",
+  });
+  if (isCancel(memory)) {
+    return null;
+  }
+
+  const disk = await text({
+    initialValue: existing?.vm.disk ?? "20G",
+    message: "Disk size",
+    placeholder: "20G",
+    validate: (v) =>
+      SIZE_RE.test(v ?? "") ? undefined : "Format: e.g. 20G or 10240M",
+  });
+  if (isCancel(disk)) {
+    return null;
+  }
+
+  return {
+    cpus: Number(cpusRaw),
+    disk: disk as string,
+    memory: memory as string,
+  };
+}
+
+async function collectEc2Config(
+  existing: SandboxConfig | null
+): Promise<SandboxConfig["ec2"] | null> {
   const region = await text({
+    initialValue: existing?.ec2?.region ?? "",
     message: "EC2 region",
     placeholder: "us-east-1",
     validate: (v) => ((v ?? "").trim() ? undefined : "Region is required"),
@@ -63,7 +125,7 @@ async function collectEc2Config(): Promise<SandboxConfig["ec2"] | null> {
   }
 
   const arch = await select<"amd64" | "arm64">({
-    initialValue: "amd64",
+    initialValue: existing?.ec2?.arch ?? "amd64",
     message: "EC2 architecture",
     options: [
       { label: "x86_64 / amd64 (t3, m/c/r families)", value: "amd64" },
@@ -75,6 +137,7 @@ async function collectEc2Config(): Promise<SandboxConfig["ec2"] | null> {
   }
 
   const sshCidr = await text({
+    initialValue: existing?.ec2?.sshCidr ?? "",
     message: "SSH allowed CIDR",
     placeholder: "203.0.113.10/32",
     validate: (v) =>
@@ -87,6 +150,7 @@ async function collectEc2Config(): Promise<SandboxConfig["ec2"] | null> {
   }
 
   const instanceType = await text({
+    initialValue: existing?.ec2?.instanceType ?? "",
     message: "EC2 instance type",
     placeholder: "optional, mapped from CPUs/memory when blank",
   });
@@ -103,23 +167,12 @@ async function collectEc2Config(): Promise<SandboxConfig["ec2"] | null> {
   };
 }
 
-export async function init(): Promise<void> {
-  const name = basename(process.cwd());
-  intro(`create-sandbox — initializing "${name}"`);
-
-  const sandboxJsonPath = join(process.cwd(), "sandbox.json");
-  if (existsSync(sandboxJsonPath)) {
-    const overwrite = await confirm({
-      initialValue: false,
-      message: "sandbox.json already exists. Overwrite?",
-    });
-    if (isCancel(overwrite) || !overwrite) {
-      bail();
-    }
-  }
-
+async function collectProviderConfig(existing: SandboxConfig | null): Promise<{
+  ec2Config?: SandboxConfig["ec2"];
+  provider: "local" | "ec2";
+} | null> {
   const provider = await select<"local" | "ec2">({
-    initialValue: "local",
+    initialValue: existing?.provider ?? "local",
     message: "Provider",
     options: [
       { label: "local (Lima/QEMU)", value: "local" },
@@ -127,65 +180,30 @@ export async function init(): Promise<void> {
     ],
   });
   if (isCancel(provider)) {
-    bail();
+    return null;
   }
 
-  let ec2Config: SandboxConfig["ec2"];
-  if (provider === "ec2") {
-    const collectedEc2Config = await collectEc2Config();
-    if (!collectedEc2Config) {
-      bail();
-    }
-    ec2Config = collectedEc2Config;
+  if (provider !== "ec2") {
+    return { provider };
   }
 
-  const ubuntu = await select<string>({
-    initialValue: "26.04",
-    message: "Ubuntu version",
-    options: [
-      { label: "Ubuntu 26.04 LTS (Resolute Raccoon)", value: "26.04" },
-      { label: "Ubuntu 24.04 LTS (Noble Numbat)", value: "24.04" },
-    ],
-  });
-  if (isCancel(ubuntu)) {
-    bail();
+  const ec2Config = await collectEc2Config(existing);
+  if (!ec2Config) {
+    return null;
   }
 
-  const cpusRaw = await text({
-    initialValue: "4",
-    message: "CPUs",
-    validate: (v) =>
-      Number.isNaN(Number(v)) || Number(v) < 1
-        ? "Must be a positive integer"
-        : undefined,
-  });
-  if (isCancel(cpusRaw)) {
-    bail();
-  }
+  return { ec2Config, provider };
+}
 
-  const memory = await text({
-    initialValue: "4G",
-    message: "Memory",
-    placeholder: "4G",
-    validate: (v) =>
-      SIZE_RE.test(v ?? "") ? undefined : "Format: e.g. 4G or 2048M",
-  });
-  if (isCancel(memory)) {
-    bail();
-  }
-
-  const disk = await text({
-    initialValue: "20G",
-    message: "Disk size",
-    placeholder: "20G",
-    validate: (v) =>
-      SIZE_RE.test(v ?? "") ? undefined : "Format: e.g. 20G or 10240M",
-  });
-  if (isCancel(disk)) {
-    bail();
-  }
+async function collectPackages(
+  existing: SandboxConfig | null
+): Promise<SandboxConfig["packages"] | null> {
+  const initialSelected = existing
+    ? ALL_PACKAGES.filter((pkg) => existing.packages[pkg]?.enabled === true)
+    : [];
 
   const selectedRaw = await multiselect<string>({
+    initialValues: initialSelected.length > 0 ? initialSelected : undefined,
     message: "Select packages to install",
     options: [
       { label: "Node.js", value: "nodejs" },
@@ -200,51 +218,94 @@ export async function init(): Promise<void> {
     required: false,
   });
   if (isCancel(selectedRaw)) {
-    bail();
+    return null;
   }
   const selectedPackages = selectedRaw as string[];
 
-  const packages = await collectPackageVersions(selectedPackages);
+  const packages = await collectPackageVersions(selectedPackages, existing);
   if (!packages) {
-    bail();
+    return null;
   }
 
-  const allPackages = [
-    "nodejs",
-    "bun",
-    "python",
-    "java",
-    "go",
-    "ruby",
-    "php",
-    "swift",
-  ];
-  for (const pkg of allPackages) {
+  for (const pkg of ALL_PACKAGES) {
     if (!(pkg in packages)) {
       packages[pkg] = { enabled: false };
     }
   }
+  return packages;
+}
 
+export async function runInitPrompts(
+  existing: SandboxConfig | null
+): Promise<SandboxConfig | null> {
+  const name = basename(process.cwd());
+
+  const providerConfig = await collectProviderConfig(existing);
+  if (!providerConfig) {
+    return null;
+  }
+
+  const ubuntu = await select<string>({
+    initialValue: existing?.ubuntu ?? "26.04",
+    message: "Ubuntu version",
+    options: [
+      { label: "Ubuntu 26.04 LTS (Resolute Raccoon)", value: "26.04" },
+      { label: "Ubuntu 24.04 LTS (Noble Numbat)", value: "24.04" },
+    ],
+  });
+  if (isCancel(ubuntu)) {
+    return null;
+  }
+
+  const vm = await collectVmResources(existing);
+  if (!vm) {
+    return null;
+  }
+
+  const packages = await collectPackages(existing);
+  if (!packages) {
+    return null;
+  }
+
+  const defaultUsername = existing?.username ?? userInfo().username;
   const remotePath = await text({
-    initialValue: `/home/ubuntu/${name}`,
+    initialValue:
+      existing?.send?.remotePath ?? `/home/${defaultUsername}/${name}`,
     message: "Remote path for file sync",
   });
   if (isCancel(remotePath)) {
+    return null;
+  }
+
+  return {
+    ...(providerConfig.provider === "ec2" && providerConfig.ec2Config
+      ? { ec2: providerConfig.ec2Config }
+      : {}),
+    packages,
+    provider: providerConfig.provider,
+    send: { remotePath: remotePath as string },
+    ubuntu: ubuntu as string,
+    username: defaultUsername,
+    vm,
+  };
+}
+
+export async function init(): Promise<void> {
+  const name = basename(process.cwd());
+  const existing = readSandboxConfigOptional();
+  const isModify = existing !== null;
+
+  intro(
+    isModify
+      ? `create-sandbox — modifying config for "${name}"`
+      : `create-sandbox — initializing "${name}"`
+  );
+
+  const config = await runInitPrompts(existing);
+  if (!config) {
     bail();
   }
 
-  const config: SandboxConfig = {
-    ...(provider === "ec2" ? { ec2: ec2Config, provider } : { provider }),
-    packages,
-    send: { remotePath: remotePath as string },
-    ubuntu: ubuntu as string,
-    vm: {
-      cpus: Number(cpusRaw),
-      disk: disk as string,
-      memory: memory as string,
-    },
-  };
-
   writeSandboxConfig(config);
-  outro("sandbox.json created. Run: create-sandbox start");
+  outro("sandbox.json saved. Run: create-sandbox start");
 }

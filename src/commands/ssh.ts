@@ -39,7 +39,7 @@ export async function ssh(): Promise<void> {
         ...(state.identityFile ? ["-i", state.identityFile] : []),
         "-p",
         String(state.port),
-        `ubuntu@${state.host}`,
+        `${config.username}@${state.host}`,
       ],
       { stdio: "inherit" }
     );

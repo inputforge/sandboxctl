@@ -1,6 +1,9 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { once } from "node:events";
 import { mkdirSync, openSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { z } from "zod";
 
 import { limaHome } from "../../paths.js";
 import { getUbuntuImageUrl } from "../../platform.js";
@@ -27,12 +30,14 @@ function toLibaSize(s: string): string {
   return s;
 }
 
-export interface LimaInstance {
-  name: string;
-  status: string;
-  sshLocalPort: number;
-  dir: string;
-}
+const LimaInstanceSchema = z.object({
+  dir: z.string(),
+  name: z.string(),
+  sshLocalPort: z.number(),
+  status: z.string(),
+});
+
+export type LimaInstance = z.infer<typeof LimaInstanceSchema>;
 
 export function getLimaInstance(name: string): LimaInstance | null {
   try {
@@ -46,7 +51,7 @@ export function getLimaInstance(name: string): LimaInstance | null {
         continue;
       }
       try {
-        const entry = JSON.parse(line) as LimaInstance;
+        const entry = LimaInstanceSchema.parse(JSON.parse(line));
         if (entry.name === name) {
           return entry;
         }
@@ -81,15 +86,16 @@ export function buildLimaYaml(
   const imageUrl = getUbuntuImageUrl(config.ubuntu, pc.ubuntuArch);
   const limaArch = pc.arch === "arm64" ? "aarch64" : "x86_64";
 
+  const { username } = config;
   const sshKeyScript = [
     "#!/bin/bash",
     "set -euo pipefail",
-    "mkdir -p /home/ubuntu/.ssh",
-    `echo '${pubKey}' >> /home/ubuntu/.ssh/authorized_keys`,
-    "sort -u /home/ubuntu/.ssh/authorized_keys -o /home/ubuntu/.ssh/authorized_keys",
-    "chown -R ubuntu:ubuntu /home/ubuntu/.ssh",
-    "chmod 700 /home/ubuntu/.ssh",
-    "chmod 600 /home/ubuntu/.ssh/authorized_keys",
+    `mkdir -p /home/${username}/.ssh`,
+    `echo '${pubKey}' >> /home/${username}/.ssh/authorized_keys`,
+    `sort -u /home/${username}/.ssh/authorized_keys -o /home/${username}/.ssh/authorized_keys`,
+    `chown -R ${username}:${username} /home/${username}/.ssh`,
+    `chmod 700 /home/${username}/.ssh`,
+    `chmod 600 /home/${username}/.ssh/authorized_keys`,
   ].join("\n");
 
   const portForwardLines = (config.ports ?? [])
@@ -112,6 +118,8 @@ export function buildLimaYaml(
     `cpus: ${config.vm.cpus}`,
     `memory: "${toLibaSize(config.vm.memory)}"`,
     `disk: "${toLibaSize(config.vm.disk)}"`,
+    "user:",
+    `  name: "${username}"`,
     "ssh:",
     "  localPort: 0",
     "  loadDotSSHPubKeys: true",
@@ -147,29 +155,41 @@ export function checkLimactlInstalled(): void {
   }
 }
 
-export function startLimaInstance(name: string, logPath: string): void {
+export async function startLimaInstance(
+  name: string,
+  logPath: string
+): Promise<void> {
   const logFd = openSync(logPath, "a");
-  execFileSync("limactl", ["start", "--tty=false", name], {
+  const child = spawn("limactl", ["start", "--tty=false", name], {
+    env: limaEnv,
+    stdio: ["ignore", logFd, logFd],
+  });
+  const [code] = await once(child, "close");
+  if (code !== 0) {
+    throw new Error(`limactl start exited with code ${code}`);
+  }
+}
+
+export function stopLimaInstance(name: string, logPath: string): void {
+  const logFd = openSync(logPath, "a");
+  execFileSync("limactl", ["stop", name], {
     env: limaEnv,
     stdio: ["ignore", logFd, logFd],
   });
 }
 
-export function stopLimaInstance(name: string): void {
-  execFileSync("limactl", ["stop", name], { env: limaEnv, stdio: "inherit" });
-}
-
-export function deleteLimaInstance(name: string): void {
+export function deleteLimaInstance(name: string, logPath: string): void {
+  const logFd = openSync(logPath, "a");
   try {
     execFileSync("limactl", ["stop", "--force", name], {
       env: limaEnv,
-      stdio: "ignore",
+      stdio: ["ignore", logFd, logFd],
     });
   } catch {
     // already stopped or doesn't exist
   }
   execFileSync("limactl", ["delete", "--force", name], {
     env: limaEnv,
-    stdio: "inherit",
+    stdio: ["ignore", logFd, logFd],
   });
 }

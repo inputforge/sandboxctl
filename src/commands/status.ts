@@ -37,7 +37,7 @@ export async function status(): Promise<void> {
   if (running && state) {
     const identity = state.identityFile ? ` -i ${state.identityFile}` : "";
     console.log(
-      `SSH:     ssh${identity} -p ${state.port} ubuntu@${state.host}`
+      `SSH:     ssh${identity} -p ${state.port} ${config.username}@${state.host}`
     );
     console.log(
       `Uptime:  ${formatUptime(Date.now() - new Date(state.startedAt).getTime())}`

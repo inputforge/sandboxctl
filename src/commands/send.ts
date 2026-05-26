@@ -45,13 +45,13 @@ export async function send(): Promise<void> {
         "--filter=:- .gitignore",
         "--exclude=.git",
         "./",
-        `ubuntu@${state.host}:${remotePath}/`,
+        `${config.username}@${state.host}:${remotePath}/`,
       ],
       { stdio: "inherit" }
     );
   } else {
     console.log(`Syncing to ${remotePath} (via tar)...`);
-    const sshCmd = `${sshTransport} ubuntu@${state.host}`;
+    const sshCmd = `${sshTransport} ${config.username}@${state.host}`;
     execSync(
       `tar czf - --exclude='.git' . | ${sshCmd} 'mkdir -p ${remotePath} && tar xzf - -C ${remotePath}'`,
       { stdio: ["pipe", "inherit", "inherit"] }

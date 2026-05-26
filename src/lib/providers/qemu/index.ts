@@ -5,9 +5,8 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { log, spinner } from "@clack/prompts";
+import { log, progress, spinner } from "@clack/prompts";
 
-import { buildUserData } from "../../cloud-init.js";
 import { buildInstallScript } from "../../installers.js";
 import {
   appDataDir,
@@ -31,19 +30,85 @@ import {
   waitForSockGone,
 } from "./qemu.js";
 
-async function downloadFile(url: string, destPath: string): Promise<void> {
+function buildUserData(
+  pubKey: string,
+  installScript: string,
+  username: string
+): string {
+  const scriptLines = installScript
+    .split("\n")
+    .map((l) => `      ${l}`)
+    .join("\n");
+  return `#cloud-config
+users:
+  - name: ${username}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    groups: [adm, dialout, cdrom, sudo, audio, dip, video, plugdev, netdev, lxd]
+    ssh_authorized_keys:
+      - ${pubKey}
+
+write_files:
+  - path: /usr/local/bin/install-tools.sh
+    permissions: '0755'
+    content: |
+${scriptLines}
+
+runcmd:
+  - /usr/local/bin/install-tools.sh
+`;
+}
+
+const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
+
+function formatProgress(downloaded: number, total: number): string {
+  return total > 0 ? `${mb(downloaded)} / ${mb(total)}` : mb(downloaded);
+}
+
+async function downloadFile(
+  url: string,
+  destPath: string,
+  label: string
+): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} downloading ${url}`);
   }
-  const file = createWriteStream(destPath);
-  await pipeline(
-    Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
-    file
-  );
+
+  const total = Number(res.headers.get("content-length") ?? 0);
+  const bar = progress(total > 0 ? { max: total } : undefined);
+  bar.start(label);
+
+  let downloaded = 0;
+
+  async function* trackProgress(source: AsyncIterable<Buffer>) {
+    for await (const chunk of source) {
+      downloaded += chunk.length;
+      bar.advance(chunk.length, formatProgress(downloaded, total));
+      yield chunk;
+    }
+  }
+
+  try {
+    const file = createWriteStream(destPath);
+    await pipeline(
+      Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
+      trackProgress,
+      file
+    );
+    bar.stop("Base image downloaded.");
+  } catch (error) {
+    bar.stop("Download failed.");
+    rmSync(destPath, { force: true });
+    throw error;
+  }
 }
 
-async function pollSsh(port: number, maxAttempts = 120): Promise<void> {
+async function pollSsh(
+  port: number,
+  username: string,
+  maxAttempts = 120
+): Promise<void> {
   for (let i = 1; i <= maxAttempts; i += 1) {
     try {
       execFileSync(
@@ -59,7 +124,7 @@ async function pollSsh(port: number, maxAttempts = 120): Promise<void> {
           "BatchMode=yes",
           "-p",
           String(port),
-          "ubuntu@localhost",
+          `${username}@localhost`,
           "exit",
         ],
         { stdio: "ignore" }
@@ -74,7 +139,7 @@ async function pollSsh(port: number, maxAttempts = 120): Promise<void> {
   );
 }
 
-async function streamInstallLog(port: number): Promise<void> {
+async function streamInstallLog(port: number, username: string): Promise<void> {
   const child = execFile("ssh", [
     "-o",
     "StrictHostKeyChecking=no",
@@ -84,7 +149,7 @@ async function streamInstallLog(port: number): Promise<void> {
     "BatchMode=yes",
     "-p",
     String(port),
-    "ubuntu@localhost",
+    `${username}@localhost`,
     "until [ -f /var/log/install-tools.log ]; do sleep 2; done; tail -f /var/log/install-tools.log",
   ]);
 
@@ -129,13 +194,13 @@ async function boot(
   {
     const s = spinner();
     s.start("Waiting for SSH...");
-    await pollSsh(port);
+    await pollSsh(port, config.username);
     s.stop("SSH ready.");
   }
 
   if (isFirstBoot) {
     log.step("Streaming install log:");
-    await streamInstallLog(port);
+    await streamInstallLog(port, config.username);
   }
 }
 
@@ -152,13 +217,11 @@ async function firstBoot(
   if (existsSync(cachedImg)) {
     log.step("Base image already cached.");
   } else {
-    const s = spinner();
-    s.start(`Downloading Ubuntu ${config.ubuntu} (${pc.ubuntuArch})...`);
     await downloadFile(
       getUbuntuImageUrl(config.ubuntu, pc.ubuntuArch),
-      cachedImg
+      cachedImg,
+      `Downloading Ubuntu ${config.ubuntu} (${pc.ubuntuArch})...`
     );
-    s.stop("Base image downloaded.");
   }
 
   {
@@ -182,7 +245,7 @@ async function firstBoot(
     const installScript = buildInstallScript(config.packages, pc.ubuntuArch);
     buildSeedImage(
       "instance-id: sandbox-vm-1\nlocal-hostname: sandbox-vm\n",
-      buildUserData(pubKey, installScript),
+      buildUserData(pubKey, installScript, config.username),
       seedImgPath()
     );
     s.stop("Seed image created.");
