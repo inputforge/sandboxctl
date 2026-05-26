@@ -28,3 +28,27 @@ export function findSshPublicKey(): string {
   }
   return generateSshKey();
 }
+
+export function findSshKeyPair(): {
+  privateKeyPath: string;
+  publicKey: string;
+} {
+  for (const candidate of CANDIDATES) {
+    const privateKeyPath = candidate.replace(/\.pub$/u, "");
+    if (existsSync(candidate) && existsSync(privateKeyPath)) {
+      return {
+        privateKeyPath,
+        publicKey: readFileSync(candidate, "utf-8").trim(),
+      };
+    }
+  }
+
+  if (!existsSync(globalKeyPubPath) || !existsSync(globalKeyPath)) {
+    generateSshKey();
+  }
+
+  return {
+    privateKeyPath: globalKeyPath,
+    publicKey: readFileSync(globalKeyPubPath, "utf-8").trim(),
+  };
+}

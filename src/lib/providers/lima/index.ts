@@ -111,7 +111,10 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
       }
 
       s.stop(isFirstBoot ? "Sandbox provisioned." : "Sandbox started.");
-      return started.sshLocalPort;
+      return {
+        host: "127.0.0.1",
+        port: started.sshLocalPort,
+      };
     },
 
     stop: (name) => {

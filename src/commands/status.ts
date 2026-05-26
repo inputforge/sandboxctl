@@ -1,3 +1,4 @@
+import { readGlobalConfig } from "../lib/global-config.js";
 import { sandboxName } from "../lib/paths.js";
 import { getPlatformConfig } from "../lib/platform.js";
 import { getProvider } from "../lib/providers/index.js";
@@ -18,7 +19,8 @@ function formatUptime(ms: number): string {
 
 export async function status(): Promise<void> {
   const name = sandboxName();
-  const provider = getProvider(getPlatformConfig());
+  const config = readSandboxConfig();
+  const provider = getProvider(config, readGlobalConfig(), getPlatformConfig());
 
   if (!provider.isInitialized(name)) {
     console.log(`Sandbox: ${name}`);
@@ -33,8 +35,10 @@ export async function status(): Promise<void> {
   console.log(`Status:  ${running ? "running" : "stopped"}`);
 
   if (running && state) {
-    const config = readSandboxConfig();
-    console.log(`SSH:     ssh -p ${state.port} ${config.username}@127.0.0.1`);
+    const identity = state.identityFile ? ` -i ${state.identityFile}` : "";
+    console.log(
+      `SSH:     ssh${identity} -p ${state.port} ${config.username}@${state.host}`
+    );
     console.log(
       `Uptime:  ${formatUptime(Date.now() - new Date(state.startedAt).getTime())}`
     );

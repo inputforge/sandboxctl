@@ -333,10 +333,12 @@ export function createQemuProvider(pc: PlatformConfig): VmProvider {
 
     isRunning: (_name) => isVmRunning(vmSockPath()),
 
-    start: (config, name, snapshot) =>
-      existsSync(vmImgPath())
-        ? subsequentBoot(pc, config, name, snapshot)
-        : firstBoot(pc, config),
+    start: async (config, name, snapshot) => {
+      const port = existsSync(vmImgPath())
+        ? await subsequentBoot(pc, config, name, snapshot)
+        : await firstBoot(pc, config);
+      return { host: "127.0.0.1", port };
+    },
 
     stop: async (_name) => {
       await sendMonitorCommand(vmSockPath(), "system_powerdown");

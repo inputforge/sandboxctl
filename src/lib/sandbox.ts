@@ -17,9 +17,18 @@ const PortForwardSchema = z.object({
   protocol: z.enum(["tcp", "udp"]).optional(),
 });
 
+const Ec2ConfigSchema = z.object({
+  arch: z.enum(["arm64", "amd64"]).optional(),
+  instanceType: z.string().optional(),
+  region: z.string().optional(),
+  sshCidr: z.string().optional(),
+});
+
 const SandboxConfigSchema = z.object({
+  ec2: Ec2ConfigSchema.optional(),
   packages: z.record(z.string(), PackageConfigSchema),
   ports: z.array(PortForwardSchema).optional(),
+  provider: z.enum(["local", "ec2"]).optional(),
   send: z
     .object({
       remotePath: z.string().optional(),
@@ -35,8 +44,15 @@ const SandboxConfigSchema = z.object({
 });
 
 const SandboxStateSchema = z.object({
-  port: z.number(),
-  startedAt: z.string(),
+  host: z.string().trim().min(1).default("127.0.0.1"),
+  identityFile: z.string().optional(),
+  port: z.number().int().min(1).max(65_535),
+  startedAt: z
+    .string()
+    .refine(
+      (value) => !Number.isNaN(new Date(value).getTime()),
+      "Invalid startedAt"
+    ),
 });
 
 export type PackageConfig = z.infer<typeof PackageConfigSchema>;
@@ -65,11 +81,16 @@ export function readSandboxConfigOptional(
   try {
     const content = readFileSync(p, "utf-8");
     return SandboxConfigSchema.parse(JSON.parse(content));
-  } catch (err) {
-    if (typeof err === "object" && err !== null && "code" in err && err.code === "ENOENT") {
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
       return null;
     }
-    throw err;
+    throw error;
   }
 }
 

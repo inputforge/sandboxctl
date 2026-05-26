@@ -111,28 +111,93 @@ async function collectVmResources(
   };
 }
 
-export async function runInitPrompts(
+async function collectEc2Config(
   existing: SandboxConfig | null
-): Promise<SandboxConfig | null> {
-  const name = basename(process.cwd());
+): Promise<SandboxConfig["ec2"] | null> {
+  const region = await text({
+    initialValue: existing?.ec2?.region ?? "",
+    message: "EC2 region",
+    placeholder: "us-east-1",
+    validate: (v) => ((v ?? "").trim() ? undefined : "Region is required"),
+  });
+  if (isCancel(region)) {
+    return null;
+  }
 
-  const ubuntu = await select<string>({
-    initialValue: existing?.ubuntu ?? "26.04",
-    message: "Ubuntu version",
+  const arch = await select<"amd64" | "arm64">({
+    initialValue: existing?.ec2?.arch ?? "amd64",
+    message: "EC2 architecture",
     options: [
-      { label: "Ubuntu 26.04 LTS (Resolute Raccoon)", value: "26.04" },
-      { label: "Ubuntu 24.04 LTS (Noble Numbat)", value: "24.04" },
+      { label: "x86_64 / amd64 (t3, m/c/r families)", value: "amd64" },
+      { label: "arm64 / Graviton (t4g, m/c/r g families)", value: "arm64" },
     ],
   });
-  if (isCancel(ubuntu)) {
+  if (isCancel(arch)) {
     return null;
   }
 
-  const vm = await collectVmResources(existing);
-  if (!vm) {
+  const sshCidr = await text({
+    initialValue: existing?.ec2?.sshCidr ?? "",
+    message: "SSH allowed CIDR",
+    placeholder: "203.0.113.10/32",
+    validate: (v) =>
+      (v ?? "").trim()
+        ? undefined
+        : "CIDR is required, for example your public IP with /32",
+  });
+  if (isCancel(sshCidr)) {
     return null;
   }
 
+  const instanceType = await text({
+    initialValue: existing?.ec2?.instanceType ?? "",
+    message: "EC2 instance type",
+    placeholder: "optional, mapped from CPUs/memory when blank",
+  });
+  if (isCancel(instanceType)) {
+    return null;
+  }
+
+  const trimmedInstanceType = (instanceType as string).trim();
+  return {
+    arch,
+    region: (region as string).trim(),
+    sshCidr: (sshCidr as string).trim(),
+    ...(trimmedInstanceType ? { instanceType: trimmedInstanceType } : {}),
+  };
+}
+
+async function collectProviderConfig(existing: SandboxConfig | null): Promise<{
+  ec2Config?: SandboxConfig["ec2"];
+  provider: "local" | "ec2";
+} | null> {
+  const provider = await select<"local" | "ec2">({
+    initialValue: existing?.provider ?? "local",
+    message: "Provider",
+    options: [
+      { label: "local (Lima/QEMU)", value: "local" },
+      { label: "ec2 (AWS EC2)", value: "ec2" },
+    ],
+  });
+  if (isCancel(provider)) {
+    return null;
+  }
+
+  if (provider !== "ec2") {
+    return { provider };
+  }
+
+  const ec2Config = await collectEc2Config(existing);
+  if (!ec2Config) {
+    return null;
+  }
+
+  return { ec2Config, provider };
+}
+
+async function collectPackages(
+  existing: SandboxConfig | null
+): Promise<SandboxConfig["packages"] | null> {
   const initialSelected = existing
     ? ALL_PACKAGES.filter((pkg) => existing.packages[pkg]?.enabled === true)
     : [];
@@ -167,6 +232,40 @@ export async function runInitPrompts(
       packages[pkg] = { enabled: false };
     }
   }
+  return packages;
+}
+
+export async function runInitPrompts(
+  existing: SandboxConfig | null
+): Promise<SandboxConfig | null> {
+  const name = basename(process.cwd());
+
+  const providerConfig = await collectProviderConfig(existing);
+  if (!providerConfig) {
+    return null;
+  }
+
+  const ubuntu = await select<string>({
+    initialValue: existing?.ubuntu ?? "26.04",
+    message: "Ubuntu version",
+    options: [
+      { label: "Ubuntu 26.04 LTS (Resolute Raccoon)", value: "26.04" },
+      { label: "Ubuntu 24.04 LTS (Noble Numbat)", value: "24.04" },
+    ],
+  });
+  if (isCancel(ubuntu)) {
+    return null;
+  }
+
+  const vm = await collectVmResources(existing);
+  if (!vm) {
+    return null;
+  }
+
+  const packages = await collectPackages(existing);
+  if (!packages) {
+    return null;
+  }
 
   const defaultUsername = existing?.username ?? userInfo().username;
   const remotePath = await text({
@@ -179,7 +278,11 @@ export async function runInitPrompts(
   }
 
   return {
+    ...(providerConfig.provider === "ec2" && providerConfig.ec2Config
+      ? { ec2: providerConfig.ec2Config }
+      : {}),
     packages,
+    provider: providerConfig.provider,
     send: { remotePath: remotePath as string },
     ubuntu: ubuntu as string,
     username: defaultUsername,
