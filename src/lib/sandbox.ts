@@ -63,9 +63,13 @@ export function readSandboxConfigOptional(
     return null;
   }
   try {
-    return SandboxConfigSchema.parse(JSON.parse(readFileSync(p, "utf-8")));
-  } catch {
-    return null;
+    const content = readFileSync(p, "utf-8");
+    return SandboxConfigSchema.parse(JSON.parse(content));
+  } catch (err) {
+    if (typeof err === "object" && err !== null && "code" in err && err.code === "ENOENT") {
+      return null;
+    }
+    throw err;
   }
 }
 
