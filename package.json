@@ -17,6 +17,8 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
+    "@aws-sdk/client-ec2": "^3.817.0",
+    "@aws-sdk/client-ssm": "^3.817.0",
     "@bomb.sh/args": "^0.3.1",
     "@clack/prompts": "^1.4.0",
     "@gcu/iso9660": "^0.1.0",
