@@ -67,7 +67,57 @@ export async function init(): Promise<void> {
     }
   }
 
-  // Ubuntu version
+  const provider = await select<"local" | "ec2">({
+    initialValue: "local",
+    message: "Provider",
+    options: [
+      { label: "local (Lima/QEMU)", value: "local" },
+      { label: "ec2 (AWS EC2)", value: "ec2" },
+    ],
+  });
+  if (isCancel(provider)) {
+    bail();
+  }
+
+  let ec2Config: SandboxConfig["ec2"];
+  if (provider === "ec2") {
+    const region = await text({
+      message: "EC2 region",
+      placeholder: "us-east-1",
+      validate: (v) => ((v ?? "").trim() ? undefined : "Region is required"),
+    });
+    if (isCancel(region)) {
+      bail();
+    }
+
+    const arch = await select<"amd64" | "arm64">({
+      initialValue: "amd64",
+      message: "EC2 architecture",
+      options: [
+        { label: "x86_64 / amd64 (t3, m/c/r families)", value: "amd64" },
+        { label: "arm64 / Graviton (t4g, m/c/r g families)", value: "arm64" },
+      ],
+    });
+    if (isCancel(arch)) {
+      bail();
+    }
+
+    const instanceType = await text({
+      message: "EC2 instance type",
+      placeholder: "optional, mapped from CPUs/memory when blank",
+    });
+    if (isCancel(instanceType)) {
+      bail();
+    }
+
+    const trimmedInstanceType = (instanceType as string).trim();
+    ec2Config = {
+      arch,
+      region: (region as string).trim(),
+      ...(trimmedInstanceType ? { instanceType: trimmedInstanceType } : {}),
+    };
+  }
+
   const ubuntu = await select<string>({
     initialValue: "26.04",
     message: "Ubuntu version",
@@ -80,7 +130,6 @@ export async function init(): Promise<void> {
     bail();
   }
 
-  // VM resources
   const cpusRaw = await text({
     initialValue: "4",
     message: "CPUs",
@@ -115,7 +164,6 @@ export async function init(): Promise<void> {
     bail();
   }
 
-  // Package selection
   const selectedRaw = await multiselect<string>({
     message: "Select packages to install",
     options: [
@@ -135,13 +183,11 @@ export async function init(): Promise<void> {
   }
   const selectedPackages = selectedRaw as string[];
 
-  // Versions for selected versioned packages
   const packages = await collectPackageVersions(selectedPackages);
   if (!packages) {
     bail();
   }
 
-  // Mark unselected packages as disabled
   const allPackages = [
     "nodejs",
     "bun",
@@ -158,7 +204,6 @@ export async function init(): Promise<void> {
     }
   }
 
-  // Remote path
   const remotePath = await text({
     initialValue: `/home/ubuntu/${name}`,
     message: "Remote path for file sync",
@@ -168,6 +213,7 @@ export async function init(): Promise<void> {
   }
 
   const config: SandboxConfig = {
+    ...(provider === "ec2" ? { ec2: ec2Config, provider } : { provider }),
     packages,
     send: { remotePath: remotePath as string },
     ubuntu: ubuntu as string,

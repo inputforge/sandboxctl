@@ -80,7 +80,10 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
         process.exit(1);
       }
 
-      return Promise.resolve(started.sshLocalPort);
+      return Promise.resolve({
+        host: "127.0.0.1",
+        port: started.sshLocalPort,
+      });
     },
 
     stop: (name) => {

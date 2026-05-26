@@ -1,13 +1,15 @@
 import { execFileSync } from "node:child_process";
 
+import { readGlobalConfig } from "../lib/global-config.js";
 import { sandboxName } from "../lib/paths.js";
 import { getPlatformConfig } from "../lib/platform.js";
 import { getProvider } from "../lib/providers/index.js";
-import { readState } from "../lib/sandbox.js";
+import { readSandboxConfig, readState } from "../lib/sandbox.js";
 
 export async function ssh(): Promise<void> {
   const name = sandboxName();
-  const provider = getProvider(getPlatformConfig());
+  const config = readSandboxConfig();
+  const provider = getProvider(config, readGlobalConfig(), getPlatformConfig());
 
   if (!(await provider.isRunning(name))) {
     console.error(
@@ -30,9 +32,10 @@ export async function ssh(): Promise<void> {
         "StrictHostKeyChecking=no",
         "-o",
         "UserKnownHostsFile=/dev/null",
+        ...(state.identityFile ? ["-i", state.identityFile] : []),
         "-p",
         String(state.port),
-        "ubuntu@127.0.0.1",
+        `ubuntu@${state.host}`,
       ],
       { stdio: "inherit" }
     );

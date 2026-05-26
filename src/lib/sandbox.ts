@@ -15,8 +15,14 @@ export interface PortForward {
 }
 
 export interface SandboxConfig {
+  ec2?: {
+    arch?: "arm64" | "amd64";
+    instanceType?: string;
+    region?: string;
+  };
   packages: Record<string, PackageConfig>;
   ports?: PortForward[];
+  provider?: "local" | "ec2";
   send?: {
     remotePath?: string;
   };
@@ -29,6 +35,8 @@ export interface SandboxConfig {
 }
 
 export interface SandboxState {
+  host: string;
+  identityFile?: string;
   port: number;
   startedAt: string;
 }
@@ -61,7 +69,16 @@ export function readState(name?: string): SandboxState | null {
     return null;
   }
   try {
-    return JSON.parse(readFileSync(p, "utf-8")) as SandboxState;
+    const state = JSON.parse(readFileSync(p, "utf-8")) as Partial<SandboxState>;
+    if (!state.port || !state.startedAt) {
+      return null;
+    }
+    return {
+      host: state.host ?? "127.0.0.1",
+      identityFile: state.identityFile,
+      port: state.port,
+      startedAt: state.startedAt,
+    };
   } catch {
     return null;
   }
