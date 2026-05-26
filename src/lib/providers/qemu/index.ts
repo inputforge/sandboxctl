@@ -7,6 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { log, spinner } from "@clack/prompts";
 
+import { buildUserData } from "../../cloud-init.js";
 import { buildInstallScript } from "../../installers.js";
 import {
   appDataDir,
@@ -29,30 +30,6 @@ import {
   spawnQemu,
   waitForSockGone,
 } from "./qemu.js";
-
-function buildUserData(pubKey: string, installScript: string): string {
-  const scriptLines = installScript
-    .split("\n")
-    .map((l) => `      ${l}`)
-    .join("\n");
-  return `#cloud-config
-password: ubuntu
-chpasswd:
-  expire: false
-ssh_pwauth: true
-ssh_authorized_keys:
-  - ${pubKey}
-
-write_files:
-  - path: /usr/local/bin/install-tools.sh
-    permissions: '0755'
-    content: |
-${scriptLines}
-
-runcmd:
-  - /usr/local/bin/install-tools.sh
-`;
-}
 
 async function downloadFile(url: string, destPath: string): Promise<void> {
   const res = await fetch(url);
@@ -293,10 +270,12 @@ export function createQemuProvider(pc: PlatformConfig): VmProvider {
 
     isRunning: (_name) => isVmRunning(vmSockPath()),
 
-    start: (config, name, snapshot) =>
-      existsSync(vmImgPath())
-        ? subsequentBoot(pc, config, name, snapshot)
-        : firstBoot(pc, config),
+    start: async (config, name, snapshot) => {
+      const port = existsSync(vmImgPath())
+        ? await subsequentBoot(pc, config, name, snapshot)
+        : await firstBoot(pc, config);
+      return { host: "127.0.0.1", port };
+    },
 
     stop: async (_name) => {
       await sendMonitorCommand(vmSockPath(), "system_powerdown");

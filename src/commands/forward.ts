@@ -66,12 +66,13 @@ export function forward(portArg: string | undefined): void {
       "UserKnownHostsFile=/dev/null",
       "-o",
       "ExitOnForwardFailure=yes",
+      ...(state.identityFile ? ["-i", state.identityFile] : []),
       "-N",
       "-L",
       `${hostPort}:localhost:${guestPort}`,
       "-p",
       String(state.port),
-      "ubuntu@localhost",
+      `ubuntu@${state.host}`,
     ],
     { stdio: "inherit" }
   );

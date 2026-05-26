@@ -8,6 +8,7 @@ export const appDataDir = paths.data;
 export const limaHome = join(appDataDir, "lima");
 export const imagesDir = join(appDataDir, "images");
 export const sandboxesDir = join(appDataDir, "sandboxes");
+export const globalConfigPath = join(appDataDir, "config.json");
 export const globalKeyPath = join(appDataDir, "id_ed25519");
 export const globalKeyPubPath = join(appDataDir, "id_ed25519.pub");
 
@@ -41,4 +42,8 @@ export function stateJsonPath(name?: string): string {
 
 export function configSnapshotPath(name?: string): string {
   return join(sandboxDir(name), "sandbox.snapshot.json");
+}
+
+export function ec2InstancePath(name?: string): string {
+  return join(sandboxDir(name), "ec2-instance.json");
 }

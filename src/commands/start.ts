@@ -1,5 +1,6 @@
 import { intro, outro, spinner } from "@clack/prompts";
 
+import { readGlobalConfig } from "../lib/global-config.js";
 import { sandboxName } from "../lib/paths.js";
 import { getPlatformConfig } from "../lib/platform.js";
 import { getProvider } from "../lib/providers/index.js";
@@ -9,20 +10,26 @@ import {
   writeConfigSnapshot,
   writeState,
 } from "../lib/sandbox.js";
+import { buildSshTransport } from "../lib/ssh-command.js";
 import { send } from "./send.js";
 
 export async function start(): Promise<void> {
   const name = sandboxName();
   const config = readSandboxConfig();
+  const globalConfig = readGlobalConfig();
   const pc = getPlatformConfig();
-  const provider = getProvider(pc);
+  const provider = getProvider(config, globalConfig, pc);
   const snapshot = readConfigSnapshot();
 
   intro(`create-sandbox — starting "${name}"`);
 
-  const port = await provider.start(config, name, snapshot);
+  const { host, identityFile, port } = await provider.start(
+    config,
+    name,
+    snapshot
+  );
 
-  writeState({ port, startedAt: new Date().toISOString() });
+  writeState({ host, identityFile, port, startedAt: new Date().toISOString() });
   writeConfigSnapshot(config);
 
   {
@@ -39,7 +46,8 @@ export async function start(): Promise<void> {
   const exposed = (config.ports ?? [])
     .map((f) => `${f.guest}/${f.protocol ?? "tcp"}`)
     .join(", ");
+  const sshCommand = buildSshTransport({ identityFile, port });
   outro(
-    `Sandbox "${name}" is ready!\n  SSH: ssh -p ${port} ubuntu@127.0.0.1${exposed ? `\n  Exposed: ${exposed}` : ""}`
+    `Sandbox "${name}" is ready!\n  SSH: ${sshCommand} ubuntu@${host}${exposed ? `\n  Exposed: ${exposed}` : ""}`
   );
 }
