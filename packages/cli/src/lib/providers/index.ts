@@ -1,32 +1,14 @@
+import type {
+  SandboxConfig,
+  VmProvider,
+  VmStartResult,
+} from "@inputforge/providers";
+
 import type { GlobalConfig } from "../global-config.js";
 import type { PlatformConfig } from "../platform.js";
-import type { SandboxConfig } from "../sandbox.js";
 import { createEc2Provider } from "./ec2/index.js";
 import { createLimaProvider } from "./lima/index.js";
 import { createQemuProvider } from "./qemu/index.js";
-
-export interface VmStartResult {
-  host: string;
-  identityFile?: string;
-  port: number;
-}
-
-export interface VmProvider {
-  isInitialized(name: string): boolean;
-  isRunning(name: string): Promise<boolean>;
-  /**
-   * Start the VM (first or subsequent boot). Handles all provider-specific
-   * setup, boot sequencing, and waiting until SSH + provisioning are ready.
-   * Returns the SSH endpoint.
-   */
-  start(
-    config: SandboxConfig,
-    name: string,
-    snapshot: SandboxConfig | null
-  ): Promise<VmStartResult>;
-  stop(name: string): Promise<void>;
-  destroy(name: string): Promise<void>;
-}
 
 interface Ec2Config {
   arch: "arm64" | "amd64";
@@ -34,6 +16,8 @@ interface Ec2Config {
   region?: string;
   sshCidr?: string;
 }
+
+type ResolvedProvider = "ec2" | "lima" | "qemu" | "vmm";
 
 function parseMemoryMiB(memory: string): number {
   const match = memory.trim().match(/^(\d+)\s*(M|MB|MIB|G|GB|GIB)$/iu);
@@ -92,17 +76,30 @@ function mergeEc2Config(
   };
 }
 
-export function getProvider(
+export function providerNeedsLocalPrerequisites(
+  provider: ResolvedProvider
+): boolean {
+  return provider === "lima" || provider === "qemu";
+}
+
+export function resolveProvider(
   sandboxConfig: SandboxConfig,
   globalConfig: GlobalConfig,
   pc: PlatformConfig
-): VmProvider {
+): ResolvedProvider {
   const configuredProvider =
     sandboxConfig.provider ??
     globalConfig.defaultProvider ??
     (pc.platform === "macos" ? "lima" : "qemu");
-  const provider =
-    configuredProvider === "local" ? pc.provider : configuredProvider;
+  return configuredProvider === "local" ? pc.provider : configuredProvider;
+}
+
+export async function getProvider(
+  sandboxConfig: SandboxConfig,
+  globalConfig: GlobalConfig,
+  pc: PlatformConfig
+): Promise<VmProvider> {
+  const provider = resolveProvider(sandboxConfig, globalConfig, pc);
 
   if (provider === "ec2") {
     const ec2Config = mergeEc2Config(
@@ -115,5 +112,11 @@ export function getProvider(
   if (provider === "lima") {
     return createLimaProvider(pc);
   }
+  if (provider === "vmm") {
+    const { createVmmProvider } = await import("@inputforge/vmm");
+    return createVmmProvider();
+  }
   return createQemuProvider(pc);
 }
+
+export type { VmProvider, VmStartResult };

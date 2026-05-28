@@ -7,7 +7,11 @@ import { readSandboxConfig } from "../lib/sandbox.js";
 export async function destroy(): Promise<void> {
   const name = sandboxName();
   const config = readSandboxConfig();
-  const provider = getProvider(config, readGlobalConfig(), getPlatformConfig());
+  const provider = await getProvider(
+    config,
+    readGlobalConfig(),
+    getPlatformConfig()
+  );
   await provider.destroy(name);
   console.log(`Sandbox "${name}" destroyed.`);
 }

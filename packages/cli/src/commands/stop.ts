@@ -9,7 +9,11 @@ import { readSandboxConfig } from "../lib/sandbox.js";
 export async function stop(): Promise<void> {
   const name = sandboxName();
   const config = readSandboxConfig();
-  const provider = getProvider(config, readGlobalConfig(), getPlatformConfig());
+  const provider = await getProvider(
+    config,
+    readGlobalConfig(),
+    getPlatformConfig()
+  );
 
   if (!(await provider.isRunning(name))) {
     console.error(`Sandbox "${name}" is not running.`);

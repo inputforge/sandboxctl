@@ -20,7 +20,11 @@ function formatUptime(ms: number): string {
 export async function status(): Promise<void> {
   const name = sandboxName();
   const config = readSandboxConfig();
-  const provider = getProvider(config, readGlobalConfig(), getPlatformConfig());
+  const provider = await getProvider(
+    config,
+    readGlobalConfig(),
+    getPlatformConfig()
+  );
 
   if (!provider.isInitialized(name)) {
     console.log(`Sandbox: ${name}`);

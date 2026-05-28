@@ -1,0 +1,30 @@
+{
+  "name": "@inputforge/vmm",
+  "version": "0.1.0",
+  "description": "Inputforge VM provider backed by the vmm Swift binary",
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "make -C src-native build && cp src-native/.build/release/vmm bin/vmm"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.4.0",
+    "@gcu/iso9660": "^0.1.0",
+    "@inputforge/providers": "0.1.0",
+    "env-paths": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  }
+}
