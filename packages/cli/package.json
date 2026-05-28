@@ -1,0 +1,28 @@
+{
+  "name": "@inputforge/create-sandbox",
+  "version": "0.1.0",
+  "description": "Create and manage Linux sandbox VMs for development",
+  "bin": {
+    "create-sandbox": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.817.0",
+    "@aws-sdk/client-ssm": "^3.817.0",
+    "@bomb.sh/args": "^0.3.1",
+    "@clack/prompts": "^1.4.0",
+    "@gcu/iso9660": "^0.1.0",
+    "env-paths": "^4.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  }
+}
