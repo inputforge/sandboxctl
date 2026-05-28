@@ -2,9 +2,12 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { userInfo } from "node:os";
 import { basename, join } from "node:path";
 
+import type { SandboxConfig } from "@inputforge/providers";
 import { z } from "zod";
 
 import { configSnapshotPath, stateJsonPath } from "./paths.js";
+
+export type { SandboxConfig } from "@inputforge/providers";
 
 const PackageConfigSchema = z.object({
   enabled: z.boolean().optional(),
@@ -28,7 +31,7 @@ const SandboxConfigSchema = z.object({
   ec2: Ec2ConfigSchema.optional(),
   packages: z.record(z.string(), PackageConfigSchema),
   ports: z.array(PortForwardSchema).optional(),
-  provider: z.enum(["local", "ec2"]).optional(),
+  provider: z.enum(["local", "ec2", "vmm"]).optional(),
   send: z
     .object({
       remotePath: z.string().optional(),
@@ -57,7 +60,6 @@ const SandboxStateSchema = z.object({
 
 export type PackageConfig = z.infer<typeof PackageConfigSchema>;
 export type PortForward = z.infer<typeof PortForwardSchema>;
-export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 export type SandboxState = z.infer<typeof SandboxStateSchema>;
 
 export function readSandboxConfig(cwd: string = process.cwd()): SandboxConfig {

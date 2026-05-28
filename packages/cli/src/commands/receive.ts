@@ -11,7 +11,11 @@ import { buildSshTransport } from "../lib/ssh-command.js";
 export async function receive(): Promise<void> {
   const name = sandboxName();
   const config = readSandboxConfig();
-  const provider = getProvider(config, readGlobalConfig(), getPlatformConfig());
+  const provider = await getProvider(
+    config,
+    readGlobalConfig(),
+    getPlatformConfig()
+  );
 
   if (!(await provider.isRunning(name))) {
     console.error(

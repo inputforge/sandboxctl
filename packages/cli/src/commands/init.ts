@@ -169,14 +169,15 @@ async function collectEc2Config(
 
 async function collectProviderConfig(existing: SandboxConfig | null): Promise<{
   ec2Config?: SandboxConfig["ec2"];
-  provider: "local" | "ec2";
+  provider: NonNullable<SandboxConfig["provider"]>;
 } | null> {
-  const provider = await select<"local" | "ec2">({
+  const provider = await select<NonNullable<SandboxConfig["provider"]>>({
     initialValue: existing?.provider ?? "local",
     message: "Provider",
     options: [
       { label: "local (Lima/QEMU)", value: "local" },
       { label: "ec2 (AWS EC2)", value: "ec2" },
+      { label: "vmm (macOS Apple Silicon)", value: "vmm" },
     ],
   });
   if (isCancel(provider)) {

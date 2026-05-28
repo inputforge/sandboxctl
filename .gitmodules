@@ -1,0 +1,3 @@
+[submodule "packages/vmm/src-native"]
+	path = packages/vmm/src-native
+	url = git@github.com:inputforge/vmm.git

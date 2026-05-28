@@ -2,7 +2,9 @@
   "name": "@inputforge/create-sandbox",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/providers",
+    "packages/vmm",
+    "packages/cli"
   ],
   "type": "module",
   "scripts": {

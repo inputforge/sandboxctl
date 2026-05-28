@@ -9,7 +9,11 @@ import { readSandboxConfig, readState } from "../lib/sandbox.js";
 export async function ssh(): Promise<void> {
   const name = sandboxName();
   const config = readSandboxConfig();
-  const provider = getProvider(config, readGlobalConfig(), getPlatformConfig());
+  const provider = await getProvider(
+    config,
+    readGlobalConfig(),
+    getPlatformConfig()
+  );
 
   if (!(await provider.isRunning(name))) {
     console.error(

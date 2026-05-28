@@ -19,10 +19,14 @@
     "@bomb.sh/args": "^0.3.1",
     "@clack/prompts": "^1.4.0",
     "@gcu/iso9660": "^0.1.0",
+    "@inputforge/providers": "0.1.0",
     "env-paths": "^4.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"
+  },
+  "optionalDependencies": {
+    "@inputforge/vmm": "0.1.0"
   }
 }

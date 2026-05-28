@@ -4,7 +4,11 @@ import { readGlobalConfig } from "../lib/global-config.js";
 import { sandboxName } from "../lib/paths.js";
 import { getPlatformConfig } from "../lib/platform.js";
 import { checkPrerequisites } from "../lib/prereqs.js";
-import { getProvider } from "../lib/providers/index.js";
+import {
+  getProvider,
+  providerNeedsLocalPrerequisites,
+  resolveProvider,
+} from "../lib/providers/index.js";
 import {
   readConfigSnapshot,
   readSandboxConfig,
@@ -19,8 +23,12 @@ export async function start(): Promise<void> {
   const config = readSandboxConfig();
   const globalConfig = readGlobalConfig();
   const pc = getPlatformConfig();
-  checkPrerequisites(pc);
-  const provider = getProvider(config, globalConfig, pc);
+  if (
+    providerNeedsLocalPrerequisites(resolveProvider(config, globalConfig, pc))
+  ) {
+    checkPrerequisites(pc);
+  }
+  const provider = await getProvider(config, globalConfig, pc);
   const snapshot = readConfigSnapshot();
 
   intro(`create-sandbox — starting "${name}"`);
