@@ -1,23 +1,21 @@
 {
-  "name": "@inputforge/vmm",
+  "name": "@inputforge/ec2",
   "version": "0.1.0",
-  "description": "Inputforge VM provider backed by the vmm Swift binary",
+  "description": "Inputforge VM provider backed by AWS EC2",
   "files": [
     "dist"
-  ],
-  "os": [
-    "darwin"
   ],
   "type": "module",
   "exports": {
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc && make -C src-native sign && cp src-native/.build/apple/Products/Release/vmm dist/vmm",
+    "build": "tsc",
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@gcu/iso9660": "^0.1.0",
+    "@aws-sdk/client-ec2": "^3.817.0",
+    "@aws-sdk/client-ssm": "^3.817.0",
     "@inputforge/providers": "0.1.0",
     "env-paths": "^4.0.0"
   },

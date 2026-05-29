@@ -9,6 +9,7 @@ import {
   providerNeedsLocalPrerequisites,
   resolveProvider,
 } from "../lib/providers/index.js";
+import { createReporter } from "../lib/reporter.js";
 import {
   readConfigSnapshot,
   readSandboxConfig,
@@ -33,10 +34,12 @@ export async function start(): Promise<void> {
 
   intro(`create-sandbox — starting "${name}"`);
 
+  const reporter = createReporter();
   const { host, identityFile, port } = await provider.start(
     config,
     name,
-    snapshot
+    snapshot,
+    reporter
   );
 
   writeState({ host, identityFile, port, startedAt: new Date().toISOString() });

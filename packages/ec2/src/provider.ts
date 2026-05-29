@@ -8,13 +8,13 @@ import {
 
 import { EC2Client } from "@aws-sdk/client-ec2";
 import { SSMClient } from "@aws-sdk/client-ssm";
-import { log, spinner } from "@clack/prompts";
+import type {
+  ProviderReporter,
+  SandboxConfig,
+  VmProvider,
+} from "@inputforge/providers";
 
-import { buildUserData } from "../../cloud-init.js";
-import { buildInstallScript } from "../../installers.js";
-import { ec2InstancePath, sandboxDir } from "../../paths.js";
-import { findSshKeyPair } from "../../ssh-key.js";
-import type { VmProvider } from "../index.js";
+import { buildUserData } from "./cloud-init.js";
 import type { Ec2InstanceState } from "./ec2.js";
 import {
   deleteKeyPair,
@@ -31,6 +31,9 @@ import {
   terminateInstance,
   waitForState,
 } from "./ec2.js";
+import { buildInstallScript } from "./installers.js";
+import { ec2InstancePath, sandboxDir } from "./paths.js";
+import { findSshKeyPair } from "./ssh-key.js";
 
 interface Ec2ProviderConfig {
   instanceType: string;
@@ -95,7 +98,7 @@ export function createEc2Provider(
   arch: "arm64" | "amd64"
 ): VmProvider {
   return {
-    destroy: async (name) => {
+    destroy: async (name, reporter) => {
       const region = requireRegion(providerConfig);
       const state = readEc2State(name);
       if (!state) {
@@ -104,8 +107,7 @@ export function createEc2Provider(
       }
 
       const { ec2Client } = createClients(region);
-      const s = spinner();
-      s.start("Terminating EC2 instance...");
+      const s = reporter.spin("Terminating EC2 instance...");
       await terminateInstance(ec2Client, state.instanceId);
       await waitForState(ec2Client, state.instanceId, "terminated");
       s.stop("EC2 instance terminated.");
@@ -128,7 +130,12 @@ export function createEc2Provider(
       return instance.state === "running";
     },
 
-    start: async (config, name) => {
+    start: async (
+      config: SandboxConfig,
+      name: string,
+      _snapshot,
+      reporter: ProviderReporter
+    ) => {
       const region = requireRegion(providerConfig);
       const { ec2Client, ssmClient } = createClients(region);
       const { privateKeyPath, publicKey } = findSshKeyPair();
@@ -138,8 +145,7 @@ export function createEc2Provider(
 
       if (existing) {
         const instance = await describeInstance(ec2Client, existing.instanceId);
-        const s = spinner();
-        s.start(
+        const s = reporter.spin(
           instance.state === "running"
             ? "EC2 instance already running."
             : "Starting EC2 instance..."
@@ -162,8 +168,7 @@ export function createEc2Provider(
         );
         s.stop("EC2 instance running.");
 
-        const ssh = spinner();
-        ssh.start("Waiting for SSH...");
+        const ssh = reporter.spin("Waiting for SSH...");
         await pollSshReady(publicIp, privateKeyPath);
         ssh.stop("SSH ready.");
 
@@ -173,15 +178,16 @@ export function createEc2Provider(
       mkdirSync(sandboxDir(name), { recursive: true });
       const sshCidr = requireSshCidr(providerConfig);
 
-      const s = spinner();
-      s.start(`Resolving Ubuntu ${config.ubuntu} AMI...`);
+      const amiSpinner = reporter.spin(
+        `Resolving Ubuntu ${config.ubuntu} AMI...`
+      );
       const amiId = await resolveUbuntuAmi(
         ssmClient,
         region,
         config.ubuntu,
         arch
       );
-      s.stop(`Resolved AMI ${amiId}.`);
+      amiSpinner.stop(`Resolved AMI ${amiId}.`);
 
       await ensureKeyPair(ec2Client, keyPairName, publicKey);
       const securityGroupId = await ensureSecurityGroup(
@@ -192,8 +198,9 @@ export function createEc2Provider(
       const installScript = buildInstallScript(config.packages, arch);
       const userData = buildUserData(publicKey, installScript);
 
-      const launch = spinner();
-      launch.start(`Launching EC2 ${providerConfig.instanceType}...`);
+      const launch = reporter.spin(
+        `Launching EC2 ${providerConfig.instanceType}...`
+      );
       const instanceId = await launchInstance(ec2Client, {
         amiId,
         instanceType: providerConfig.instanceType,
@@ -212,26 +219,29 @@ export function createEc2Provider(
       );
       launch.stop("EC2 instance running.");
 
-      const ssh = spinner();
-      ssh.start("Waiting for SSH...");
+      const ssh = reporter.spin("Waiting for SSH...");
       await pollSshReady(publicIp, privateKeyPath);
       ssh.stop("SSH ready.");
 
-      log.step("Streaming install log:");
-      await streamInstallLog(publicIp, privateKeyPath);
+      reporter.step("Streaming install log:");
+      await streamInstallLog(publicIp, privateKeyPath, (line) =>
+        reporter.log(line)
+      );
 
       return { host: publicIp, identityFile: privateKeyPath, port: 22 };
     },
 
-    stop: async (name) => {
+    stop: async (name, reporter) => {
       const region = requireRegion(providerConfig);
       const state = readEc2State(name);
       if (!state) {
         return;
       }
       const { ec2Client } = createClients(region);
+      const s = reporter.spin("Stopping EC2 instance...");
       await stopInstance(ec2Client, state.instanceId);
       await waitForState(ec2Client, state.instanceId, "stopped");
+      s.stop("EC2 instance stopped.");
     },
   };
 }

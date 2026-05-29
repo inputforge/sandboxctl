@@ -5,5 +5,5 @@ export function resolveVmmBinary(): string {
   if (platform() !== "darwin" || arch() !== "arm64") {
     throw new Error("vmm provider requires macOS on Apple Silicon");
   }
-  return fileURLToPath(new URL("../bin/vmm", import.meta.url));
+  return fileURLToPath(new URL("vmm", import.meta.url));
 }

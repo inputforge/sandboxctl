@@ -175,7 +175,7 @@ async function collectProviderConfig(existing: SandboxConfig | null): Promise<{
     initialValue: existing?.provider ?? "local",
     message: "Provider",
     options: [
-      { label: "local (Lima/QEMU)", value: "local" },
+      { label: "local (QEMU)", value: "local" },
       { label: "ec2 (AWS EC2)", value: "ec2" },
       { label: "vmm (macOS Apple Silicon)", value: "vmm" },
     ],

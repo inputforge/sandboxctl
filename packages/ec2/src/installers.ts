@@ -1,4 +1,4 @@
-import type { PackageConfig } from "./sandbox.js";
+import type { PackageConfig } from "@inputforge/providers";
 
 type InstallerFn = (
   cfg: PackageConfig,

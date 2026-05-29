@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, openSync, readFileSync, rmSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, rmSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 function readPid(pidFile: string): number | null {
@@ -23,15 +23,18 @@ export function spawnVmm(
   vmmBin: string,
   configPath: string,
   pidFile: string,
-  logPath: string
+  logPath: string,
+  socketPath: string
 ): void {
   rmSync(pidFile, { force: true });
   const logFd = openSync(logPath, "a");
-  const child = spawn(vmmBin, ["run", "--pid-file", pidFile, configPath], {
-    detached: true,
-    stdio: ["ignore", logFd, logFd],
-  });
+  const child = spawn(
+    vmmBin,
+    ["run", "--pid-file", pidFile, "--socket", socketPath, configPath],
+    { detached: true, stdio: ["ignore", logFd, logFd] }
+  );
   child.unref();
+  closeSync(logFd);
 }
 
 export function isVmmRunning(pidFile: string): boolean {
