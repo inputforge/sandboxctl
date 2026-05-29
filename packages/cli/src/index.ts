@@ -49,7 +49,10 @@ if (!command) {
 
 const commands: Record<string, () => Promise<void>> = {
   destroy,
-  doctor: () => Promise.resolve(doctor()),
+  doctor: () => {
+    doctor();
+    return Promise.resolve();
+  },
   forward: () => Promise.resolve(forward(args._[1] as string | undefined)),
   init,
   receive,

@@ -1,10 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-
 import type { PackageConfig } from "@inputforge/providers";
-
-const USERNAME_RE = /^[A-Za-z0-9_-]+$/u;
 
 type InstallerFn = (
   cfg: PackageConfig,
@@ -111,8 +105,7 @@ export function buildInstallScript(
     "set -euo pipefail",
     "exec > /var/log/install-tools.log 2>&1",
     "",
-    "timeout 30 bash -c 'until timedatectl show -p NTPSynchronized --value | grep -q yes; do sleep 1; done' || true",
-    "apt-get -o Acquire::Check-Valid-Until=false update -qq",
+    "apt-get update -qq",
     "",
   ];
 
@@ -129,90 +122,4 @@ export function buildInstallScript(
 
   lines.push('echo "==> Done."');
   return lines.join("\n");
-}
-
-function yamlDq(value: string): string {
-  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
-}
-
-export function buildUserData(
-  pubKey: string,
-  installScript: string,
-  username: string
-): string {
-  if (!USERNAME_RE.test(username)) {
-    throw new Error(
-      `Invalid username "${username}": only [A-Za-z0-9_-] allowed`
-    );
-  }
-  const scriptLines = installScript
-    .split("\n")
-    .map((line) => `      ${line}`)
-    .join("\n");
-  return `#cloud-config
-users:
-  - name: ${yamlDq(username)}
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    shell: /bin/bash
-    groups: [adm, dialout, cdrom, sudo, audio, dip, video, plugdev, netdev, lxd]
-    ssh_authorized_keys:
-      - ${yamlDq(pubKey)}
-
-write_files:
-  - path: /usr/local/bin/install-tools.sh
-    permissions: '0755'
-    content: |
-${scriptLines}
-
-runcmd:
-  - /usr/local/bin/install-tools.sh
-`;
-}
-
-export function buildSeedImage(
-  metaData: string,
-  userData: string,
-  destPath: string
-): void {
-  // VZDiskImageStorageDeviceAttachment does not accept ISO 9660.
-  // Create a raw FAT16 image (same approach as vmm's prepare-ubuntu-efi.sh).
-  rmSync(destPath, { force: true });
-  execFileSync(
-    "dd",
-    ["if=/dev/zero", `of=${destPath}`, "bs=1024", "count=4096"],
-    { stdio: "ignore" }
-  );
-
-  const attachOutput = execFileSync(
-    "hdiutil",
-    [
-      "attach",
-      "-imagekey",
-      "diskimage-class=CRawDiskImage",
-      "-nomount",
-      destPath,
-    ],
-    { encoding: "utf-8" }
-  ).trim();
-  const [device] = attachOutput.split(/\s+/u);
-  if (!device) {
-    throw new Error("hdiutil attach produced no device");
-  }
-
-  try {
-    execFileSync("newfs_msdos", ["-v", "CIDATA", device], { stdio: "ignore" });
-    execFileSync("diskutil", ["mount", device], { stdio: "ignore" });
-    const info = execFileSync("diskutil", ["info", device], {
-      encoding: "utf-8",
-    });
-    const mp = info.match(/Mount Point:\s+(.+)/u)?.[1]?.trim();
-    if (!mp) {
-      throw new Error("Could not determine mount point for seed disk");
-    }
-
-    writeFileSync(join(mp, "meta-data"), metaData, "utf-8");
-    writeFileSync(join(mp, "user-data"), userData, "utf-8");
-  } finally {
-    execFileSync("hdiutil", ["detach", device], { stdio: "ignore" });
-  }
 }

@@ -3,7 +3,7 @@ import { intro, outro } from "@clack/prompts";
 import { getPlatformConfig } from "../lib/platform.js";
 import { reportPrerequisites } from "../lib/prereqs.js";
 
-export function doctor(): void {
+export function doctor(): number {
   const pc = getPlatformConfig();
   intro(`create-sandbox doctor — ${pc.platform} / ${pc.arch}`);
 
@@ -20,8 +20,8 @@ export function doctor(): void {
 
   if (allOk) {
     outro("All prerequisites satisfied.");
-  } else {
-    outro("Install missing prerequisites, then re-run.");
-    process.exit(1);
+    return 0;
   }
+  outro("Install missing prerequisites, then re-run.");
+  return 1;
 }

@@ -27,6 +27,10 @@ const Ec2ConfigSchema = z.object({
   sshCidr: z.string().optional(),
 });
 
+const VmmHostConfigSchema = z.object({
+  boot: z.enum(["efi", "linux"]).optional(),
+});
+
 const SandboxConfigSchema = z.object({
   ec2: Ec2ConfigSchema.optional(),
   packages: z.record(z.string(), PackageConfigSchema),
@@ -40,10 +44,12 @@ const SandboxConfigSchema = z.object({
   ubuntu: z.string(),
   username: z.string().default(() => userInfo().username),
   vm: z.object({
+    arch: z.enum(["arm64", "amd64"]).optional(),
     cpus: z.number(),
     disk: z.string(),
     memory: z.string(),
   }),
+  vmm: VmmHostConfigSchema.optional(),
 });
 
 const SandboxStateSchema = z.object({

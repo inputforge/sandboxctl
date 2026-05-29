@@ -5,10 +5,6 @@ import type {
 } from "@inputforge/providers";
 
 import type { GlobalConfig } from "../global-config.js";
-import type { PlatformConfig } from "../platform.js";
-import { createEc2Provider } from "./ec2/index.js";
-import { createLimaProvider } from "./lima/index.js";
-import { createQemuProvider } from "./qemu/index.js";
 
 interface Ec2Config {
   arch: "arm64" | "amd64";
@@ -17,7 +13,12 @@ interface Ec2Config {
   sshCidr?: string;
 }
 
-type ResolvedProvider = "ec2" | "lima" | "qemu" | "vmm";
+export type ResolvedProvider = "ec2" | "qemu" | "vmm";
+
+interface PlatformHint {
+  provider: "qemu" | "vmm";
+  ubuntuArch: "arm64" | "amd64";
+}
 
 function parseMemoryMiB(memory: string): number {
   const match = memory.trim().match(/^(\d+)\s*(M|MB|MIB|G|GB|GIB)$/iu);
@@ -61,7 +62,11 @@ function mergeEc2Config(
   globalConfig: GlobalConfig,
   defaultArch: "arm64" | "amd64"
 ): Ec2Config {
-  const arch = sandboxConfig.ec2?.arch ?? globalConfig.ec2?.arch ?? defaultArch;
+  const arch =
+    sandboxConfig.ec2?.arch ??
+    globalConfig.ec2?.arch ??
+    sandboxConfig.vm.arch ??
+    defaultArch;
   return {
     arch,
     instanceType:
@@ -79,25 +84,34 @@ function mergeEc2Config(
 export function providerNeedsLocalPrerequisites(
   provider: ResolvedProvider
 ): boolean {
-  return provider === "lima" || provider === "qemu";
+  return provider === "qemu";
 }
 
 export function resolveProvider(
   sandboxConfig: SandboxConfig,
   globalConfig: GlobalConfig,
-  pc: PlatformConfig
+  pc: PlatformHint
 ): ResolvedProvider {
   const configuredProvider =
-    sandboxConfig.provider ??
-    globalConfig.defaultProvider ??
-    (pc.platform === "macos" ? "lima" : "qemu");
-  return configuredProvider === "local" ? pc.provider : configuredProvider;
+    sandboxConfig.provider ?? globalConfig.defaultProvider ?? pc.provider;
+  const provider =
+    configuredProvider === "local" ? pc.provider : configuredProvider;
+
+  // vmm only supports native arch — fall back to qemu for cross-arch requests
+  if (provider === "vmm") {
+    const guestArch = sandboxConfig.vm.arch ?? pc.ubuntuArch;
+    if (guestArch !== pc.ubuntuArch) {
+      return "qemu";
+    }
+  }
+
+  return provider;
 }
 
 export async function getProvider(
   sandboxConfig: SandboxConfig,
   globalConfig: GlobalConfig,
-  pc: PlatformConfig
+  pc: PlatformHint
 ): Promise<VmProvider> {
   const provider = resolveProvider(sandboxConfig, globalConfig, pc);
 
@@ -107,16 +121,16 @@ export async function getProvider(
       globalConfig,
       pc.ubuntuArch
     );
+    const { createEc2Provider } = await import("@inputforge/ec2");
     return createEc2Provider(ec2Config, ec2Config.arch);
-  }
-  if (provider === "lima") {
-    return createLimaProvider(pc);
   }
   if (provider === "vmm") {
     const { createVmmProvider } = await import("@inputforge/vmm");
     return createVmmProvider();
   }
-  return createQemuProvider(pc);
+  const { createQemuProvider, getPlatformConfig } =
+    await import("@inputforge/qemu");
+  return createQemuProvider(getPlatformConfig());
 }
 
 export type { VmProvider, VmStartResult };

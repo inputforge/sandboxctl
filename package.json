@@ -3,6 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/providers",
+    "packages/ec2",
+    "packages/qemu",
     "packages/vmm",
     "packages/cli"
   ],

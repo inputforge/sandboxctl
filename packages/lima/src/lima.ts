@@ -3,12 +3,12 @@ import { once } from "node:events";
 import { mkdirSync, openSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { SandboxConfig } from "@inputforge/providers";
 import { z } from "zod";
 
-import { limaHome } from "../../paths.js";
-import { getUbuntuImageUrl } from "../../platform.js";
-import type { PlatformConfig } from "../../platform.js";
-import type { SandboxConfig } from "../../sandbox.js";
+import { limaHome } from "./paths.js";
+import type { PlatformConfig } from "./platform.js";
+import { getUbuntuImageUrl } from "./platform.js";
 
 const limaEnv = { ...process.env, LIMA_HOME: limaHome };
 
