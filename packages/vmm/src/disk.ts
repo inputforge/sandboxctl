@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import { once } from "node:events";
 import { createWriteStream, promises as fsp } from "node:fs";
 import { rm } from "node:fs/promises";
 import { Readable } from "node:stream";
@@ -8,6 +9,24 @@ import { promisify } from "node:util";
 import type { ProgressHandle } from "@inputforge/providers";
 
 const execFileAsync = promisify(execFile);
+const GZIP_HEADER_WINDOW_BYTES = 2048;
+const GZIP_DEFLATE_METHOD = 0x08;
+const GZIP_RESERVED_FLAG_START = 0x20;
+
+function isValidGzipOffset(data: Buffer, offset: number): boolean {
+  if (offset < 0 || offset > GZIP_HEADER_WINDOW_BYTES) {
+    return false;
+  }
+  if (offset + 10 > data.length) {
+    return false;
+  }
+  return (
+    data[offset] === 0x1f &&
+    data[offset + 1] === 0x8b &&
+    data[offset + 2] === GZIP_DEFLATE_METHOD &&
+    data[offset + 3] < GZIP_RESERVED_FLAG_START
+  );
+}
 
 const UBUNTU_CODENAMES: Record<string, string> = {
   "24.04": "noble",
@@ -106,12 +125,29 @@ async function downloadFile(
 async function spawnToFile(
   cmd: string,
   args: string[],
-  destPath: string
+  destPath: string,
+  allowedExitCodes: number[] = []
 ): Promise<void> {
   const out = createWriteStream(destPath);
   const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "ignore"] });
-  // non-zero exit is OK (zstd exits 1 on trailing bytes) — output is still valid
-  await pipeline(child.stdout as Readable, out);
+  const close = once(child, "close") as Promise<[number | null]>;
+  const waitForError = async (): Promise<never> => {
+    const [cause] = await once(child, "error");
+    throw cause;
+  };
+  const exit = Promise.race([close, waitForError()]);
+
+  const [, [exitCode]] = await Promise.all([
+    pipeline(child.stdout as Readable, out),
+    exit,
+  ]);
+  if (
+    exitCode !== null &&
+    exitCode !== 0 &&
+    !allowedExitCodes.includes(exitCode)
+  ) {
+    throw new Error(`${cmd} exited with code ${exitCode}`);
+  }
 }
 
 async function extractKernel(
@@ -128,7 +164,7 @@ async function extractKernel(
     await fsp.writeFile(zstPath, data.subarray(zstdOffset));
     try {
       // -dc: decompress to stdout; exits non-zero on trailing bytes — that's fine
-      await spawnToFile("zstd", ["-dc", zstPath], vmlinuxPath);
+      await spawnToFile("zstd", ["-dc", zstPath], vmlinuxPath, [1]);
     } finally {
       await rm(zstPath, { force: true });
     }
@@ -138,7 +174,7 @@ async function extractKernel(
   // gzip magic — whole file or payload at offset (e.g. Ubuntu 24.04)
   const gzipMagic = Buffer.from([0x1f, 0x8b]);
   const gzipOffset = data.indexOf(gzipMagic);
-  if (gzipOffset !== -1) {
+  if (isValidGzipOffset(data, gzipOffset)) {
     const gzPath = `${vmlinuxPath}.gz`;
     await fsp.writeFile(gzPath, data.subarray(gzipOffset));
     try {

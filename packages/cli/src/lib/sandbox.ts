@@ -9,9 +9,17 @@ import { configSnapshotPath, stateJsonPath } from "./paths.js";
 
 export type { SandboxConfig } from "@inputforge/providers";
 
+const PACKAGE_VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z.+_-]*$/u;
+
 const PackageConfigSchema = z.object({
   enabled: z.boolean().optional(),
-  version: z.string().optional(),
+  version: z
+    .string()
+    .regex(
+      PACKAGE_VERSION_RE,
+      "Package version may only contain letters, numbers, dots, pluses, underscores, and hyphens"
+    )
+    .optional(),
 });
 
 const PortForwardSchema = z.object({

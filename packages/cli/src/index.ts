@@ -47,12 +47,9 @@ if (!command) {
   process.exit(0);
 }
 
-const commands: Record<string, () => Promise<void>> = {
+const commands: Record<string, () => Promise<unknown>> = {
   destroy,
-  doctor: () => {
-    doctor();
-    return Promise.resolve();
-  },
+  doctor: () => Promise.resolve(doctor()),
   forward: () => Promise.resolve(forward(args._[1] as string | undefined)),
   init,
   receive,
@@ -70,7 +67,10 @@ if (!handler) {
 }
 
 try {
-  await handler();
+  const code = await handler();
+  if (typeof code === "number" && code !== 0) {
+    process.exit(code);
+  }
 } catch (error: unknown) {
   console.error(String(error));
   process.exit(1);

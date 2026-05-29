@@ -22,6 +22,10 @@ function generateSshKey(): string {
 }
 
 export function findSshPublicKey(): string {
+  if (existsSync(globalKeyPubPath)) {
+    return readFileSync(globalKeyPubPath, "utf-8").trim();
+  }
+
   for (const candidate of SSH_PUBLIC_KEY_CANDIDATES) {
     if (existsSync(candidate)) {
       return readFileSync(candidate, "utf-8").trim();

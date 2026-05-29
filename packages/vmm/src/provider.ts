@@ -50,15 +50,25 @@ import { resolveVmmBinary } from "./vmm-binary.js";
 import { buildEfiVmmConfig, buildLinuxVmmConfig } from "./vmm-config.js";
 
 const execFileAsync = promisify(execFile);
+const ARP_LINE_RE = /\(([^)]+)\) at ([0-9a-f:]+)/iu;
+
+function normalizeMac(mac: string): string {
+  return mac
+    .split(":")
+    .map((octet) => octet.padStart(2, "0").toLowerCase())
+    .join(":");
+}
 
 async function lookupArp(mac: string): Promise<string | null> {
+  const normalizedTarget = normalizeMac(mac);
   try {
     const { stdout } = await execFileAsync("arp", ["-an"], {
       encoding: "utf-8",
     });
     for (const line of stdout.split("\n")) {
-      const match = line.match(/\(([^)]+)\) at ([0-9a-f:]+)/iu);
-      if (match?.[2]?.toLowerCase() === mac) {
+      const match = line.match(ARP_LINE_RE);
+      const parsedMac = match?.[2];
+      if (parsedMac && normalizeMac(parsedMac) === normalizedTarget) {
         return match[1] ?? null;
       }
     }

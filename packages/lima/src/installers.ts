@@ -5,8 +5,18 @@ type InstallerFn = (
   ubuntuArch: "arm64" | "amd64"
 ) => string[];
 
+const PACKAGE_VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z.+_-]*$/u;
+
+function safeVersion(version: string): string {
+  if (!PACKAGE_VERSION_RE.test(version)) {
+    throw new Error(`Invalid package version: ${version}`);
+  }
+  return version;
+}
+
 const installers: Record<string, InstallerFn> = {
-  bun({ version = "latest" }, ubuntuArch) {
+  bun({ version: rawVersion = "latest" }, ubuntuArch) {
+    const version = safeVersion(rawVersion);
     const linuxArch = ubuntuArch === "arm64" ? "aarch64" : "x64";
     const tag = version === "latest" ? "latest" : `bun-v${version}`;
     const url =
@@ -24,7 +34,8 @@ const installers: Record<string, InstallerFn> = {
     ];
   },
 
-  go({ version = "1.24.3" }, ubuntuArch) {
+  go({ version: rawVersion = "1.24.3" }, ubuntuArch) {
+    const version = safeVersion(rawVersion);
     const goArch = ubuntuArch === "arm64" ? "arm64" : "amd64";
     return [
       `echo "==> Go ${version} (linux-${goArch})..."`,
@@ -37,7 +48,8 @@ const installers: Record<string, InstallerFn> = {
     ];
   },
 
-  java({ version = "21" }) {
+  java({ version: rawVersion = "21" }) {
+    const version = safeVersion(rawVersion);
     return [
       `echo "==> OpenJDK ${version}..."`,
       `apt-get install -y openjdk-${version}-jdk`,
@@ -45,7 +57,8 @@ const installers: Record<string, InstallerFn> = {
     ];
   },
 
-  nodejs({ version = "22" }) {
+  nodejs({ version: rawVersion = "22" }) {
+    const version = safeVersion(rawVersion);
     return [
       `echo "==> Node.js ${version}.x via NodeSource..."`,
       `curl -fsSL https://deb.nodesource.com/setup_${version}.x | bash -`,
@@ -78,7 +91,8 @@ const installers: Record<string, InstallerFn> = {
     ];
   },
 
-  swift({ version = "6.0.3" }, ubuntuArch) {
+  swift({ version: rawVersion = "6.0.3" }, ubuntuArch) {
+    const version = safeVersion(rawVersion);
     const archSuffix =
       ubuntuArch === "arm64" ? "ubuntu2404-aarch64" : "ubuntu2404";
     const tarSuffix =

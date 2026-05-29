@@ -46,7 +46,7 @@ export function getPlatformConfig(): PlatformConfig {
       accel: "hvf",
       arch: "x86_64",
       extraArgs: ["-no-hpet"],
-      firmware: "/opt/homebrew/share/qemu/edk2-x86_64-code.fd",
+      firmware: "/usr/local/share/qemu/edk2-x86_64-code.fd",
       machine: "q35",
       platform: "macos",
       provider: "qemu",
