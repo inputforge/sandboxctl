@@ -2,10 +2,9 @@ import { basename, join } from "node:path";
 
 import envPaths from "env-paths";
 
-const paths = envPaths("create-sandbox", { suffix: "" });
+const paths = envPaths("sandboxctl", { suffix: "" });
 
 export const appDataDir = paths.data;
-export const limaHome = join(appDataDir, "lima");
 export const imagesDir = join(appDataDir, "images");
 export const sandboxesDir = join(appDataDir, "sandboxes");
 export const globalConfigPath = join(appDataDir, "config.json");
@@ -24,6 +23,10 @@ export function vmImgPath(name?: string): string {
   return join(sandboxDir(name), "ubuntu-vm.img");
 }
 
+export function vmRawDiskPath(name?: string): string {
+  return join(sandboxDir(name), "disk.raw");
+}
+
 export function seedImgPath(name?: string): string {
   return join(sandboxDir(name), "seed.iso");
 }
@@ -34,6 +37,18 @@ export function vmSockPath(name?: string): string {
 
 export function vmLogPath(name?: string): string {
   return join(sandboxDir(name), "vm.log");
+}
+
+export function vmmPidPath(name?: string): string {
+  return join(sandboxDir(name), "vmm.pid");
+}
+
+export function vmmConfigPath(name?: string): string {
+  return join(sandboxDir(name), "vmm-config.json");
+}
+
+export function vmmStateDirPath(name?: string): string {
+  return join(sandboxDir(name), "efi-state");
 }
 
 export function stateJsonPath(name?: string): string {

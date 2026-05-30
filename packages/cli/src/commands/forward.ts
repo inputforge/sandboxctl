@@ -7,9 +7,7 @@ export function forward(portArg: string | undefined): void {
   const name = sandboxName();
   const state = readState(name);
   if (!state) {
-    console.error(
-      `Sandbox "${name}" is not running. Run: create-sandbox start`
-    );
+    console.error(`Sandbox "${name}" is not running. Run: sandboxctl start`);
     process.exit(1);
   }
 
@@ -18,14 +16,14 @@ export function forward(portArg: string | undefined): void {
     const exposed = config.ports ?? [];
     if (exposed.length === 0) {
       console.error(
-        "No ports exposed in sandbox.json. Usage: create-sandbox forward <host-port>:<guest-port>"
+        "No ports exposed in sandbox.json. Usage: sandboxctl forward <host-port>:<guest-port>"
       );
     } else {
       console.error(
         `Exposed ports: ${exposed.map((f) => `${f.guest}/${f.protocol ?? "tcp"}`).join(", ")}`
       );
       console.error(
-        "Usage: create-sandbox forward <guest-port>  or  create-sandbox forward <host-port>:<guest-port>"
+        "Usage: sandboxctl forward <guest-port>  or  sandboxctl forward <host-port>:<guest-port>"
       );
     }
     process.exit(1);

@@ -1,12 +1,8 @@
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 
-import { spinner } from "@clack/prompts";
+import type { VmProvider } from "@inputforge/providers";
 
-import { buildInstallScript } from "../../installers.js";
-import { sandboxDir, vmLogPath } from "../../paths.js";
-import type { PlatformConfig } from "../../platform.js";
-import { findSshPublicKey } from "../../ssh-key.js";
-import type { VmProvider } from "../index.js";
+import { buildInstallScript } from "./installers.js";
 import {
   buildLimaYaml,
   checkLimactlInstalled,
@@ -17,12 +13,15 @@ import {
   stopLimaInstance,
   writeLimaYaml,
 } from "./lima.js";
+import { sandboxDir, vmLogPath } from "./paths.js";
+import type { PlatformConfig } from "./platform.js";
+import { findSshPublicKey } from "./ssh-key.js";
 
 export function createLimaProvider(pc: PlatformConfig): VmProvider {
   return {
-    destroy: (name) => {
+    destroy: (name, _reporter) => {
       deleteLimaInstance(name, vmLogPath(name));
-      rmSync(sandboxDir(), { force: true, recursive: true });
+      rmSync(sandboxDir(name), { force: true, recursive: true });
       return Promise.resolve();
     },
 
@@ -30,7 +29,7 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
 
     isRunning: (name) => Promise.resolve(isLimaRunning(name)),
 
-    start: async (config, name, snapshot) => {
+    start: async (config, name, snapshot, reporter) => {
       checkLimactlInstalled();
 
       const instance = getLimaInstance(name);
@@ -39,42 +38,38 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
       if (!isFirstBoot && instance.status === "Running") {
         if (snapshot) {
           if (config.ubuntu !== snapshot.ubuntu) {
-            console.error(
+            throw new Error(
               `sandbox.json "ubuntu" changed (${snapshot.ubuntu} → ${config.ubuntu}).\n` +
-                "This requires a full rebuild. Run: create-sandbox destroy && create-sandbox start"
+                "This requires a full rebuild. Run: sandboxctl destroy && sandboxctl start"
             );
-            process.exit(1);
           }
           if (
             JSON.stringify(config.packages) !==
             JSON.stringify(snapshot.packages)
           ) {
-            console.error(
+            throw new Error(
               'sandbox.json "packages" changed.\n' +
-                "This requires a full rebuild. Run: create-sandbox destroy && create-sandbox start"
+                "This requires a full rebuild. Run: sandboxctl destroy && sandboxctl start"
             );
-            process.exit(1);
           }
         }
-        console.error(`Sandbox "${name}" is already running.`);
-        process.exit(1);
+        throw new Error(`Sandbox "${name}" is already running.`);
       }
 
       const pubKey = findSshPublicKey();
       const installScript = buildInstallScript(config.packages, pc.ubuntuArch);
       const yaml = buildLimaYaml(config, pc, installScript, pubKey);
 
-      mkdirSync(sandboxDir(), { recursive: true });
+      mkdirSync(sandboxDir(name), { recursive: true });
       writeLimaYaml(name, yaml);
 
       const label = isFirstBoot
         ? "Creating and provisioning sandbox (this may take a few minutes)..."
         : "Starting sandbox...";
 
-      const s = spinner();
-      s.start(label);
+      const s = reporter.spin(label);
 
-      const logPath = vmLogPath();
+      const logPath = vmLogPath(name);
       const startedAt = Date.now();
       const logTail = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startedAt) / 1000);
@@ -89,9 +84,9 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
             .filter(Boolean);
           const last = lines.at(-1);
           const msg = last ? (last.match(/msg="([^"]+)"/u)?.[1] ?? last) : "";
-          s.message(`${label} [${elapsedStr}]\n  ${msg.slice(0, 100)}`);
+          s.update(`${label} [${elapsedStr}]\n  ${msg.slice(0, 100)}`);
         } catch {
-          s.message(`${label} [${elapsedStr}]`);
+          s.update(`${label} [${elapsedStr}]`);
         }
       }, 1000);
 
@@ -107,7 +102,7 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
       const started = getLimaInstance(name);
       if (!started) {
         s.stop("Lima instance did not start.");
-        process.exit(1);
+        throw new Error("Lima instance did not start.");
       }
 
       s.stop(isFirstBoot ? "Sandbox provisioned." : "Sandbox started.");
@@ -117,7 +112,7 @@ export function createLimaProvider(pc: PlatformConfig): VmProvider {
       };
     },
 
-    stop: (name) => {
+    stop: (name, _reporter) => {
       stopLimaInstance(name, vmLogPath(name));
       return Promise.resolve();
     },

@@ -22,10 +22,10 @@ const command = args._[0] as string | undefined;
 
 if (args.help) {
   console.log(`
-create-sandbox — Linux VM sandbox manager
+sandboxctl — Linux VM sandbox manager
 
 Usage:
-  create-sandbox <command>
+  sandboxctl <command>
 
 Commands:
   init              Configure sandbox.json interactively
@@ -47,7 +47,7 @@ if (!command) {
   process.exit(0);
 }
 
-const commands: Record<string, () => Promise<void>> = {
+const commands: Record<string, () => Promise<unknown>> = {
   destroy,
   doctor: () => Promise.resolve(doctor()),
   forward: () => Promise.resolve(forward(args._[1] as string | undefined)),
@@ -67,7 +67,10 @@ if (!handler) {
 }
 
 try {
-  await handler();
+  const code = await handler();
+  if (typeof code === "number" && code !== 0) {
+    process.exit(code);
+  }
 } catch (error: unknown) {
   console.error(String(error));
   process.exit(1);

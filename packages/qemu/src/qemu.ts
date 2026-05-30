@@ -5,7 +5,7 @@ import { createConnection } from "node:net";
 import { setPriority } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { PlatformConfig } from "../../platform.js";
+import type { PlatformConfig } from "./platform.js";
 
 export interface QemuStartOptions {
   cpus: number;

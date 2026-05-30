@@ -1,8 +1,12 @@
 {
-  "name": "@inputforge/create-sandbox",
+  "name": "@inputforge/sandboxctl",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/providers",
+    "packages/ec2",
+    "packages/qemu",
+    "packages/vmm",
+    "packages/cli"
   ],
   "type": "module",
   "scripts": {

@@ -2,13 +2,24 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { userInfo } from "node:os";
 import { basename, join } from "node:path";
 
+import type { SandboxConfig } from "@inputforge/providers";
 import { z } from "zod";
 
 import { configSnapshotPath, stateJsonPath } from "./paths.js";
 
+export type { SandboxConfig } from "@inputforge/providers";
+
+const PACKAGE_VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z.+_-]*$/u;
+
 const PackageConfigSchema = z.object({
   enabled: z.boolean().optional(),
-  version: z.string().optional(),
+  version: z
+    .string()
+    .regex(
+      PACKAGE_VERSION_RE,
+      "Package version may only contain letters, numbers, dots, pluses, underscores, and hyphens"
+    )
+    .optional(),
 });
 
 const PortForwardSchema = z.object({
@@ -24,11 +35,15 @@ const Ec2ConfigSchema = z.object({
   sshCidr: z.string().optional(),
 });
 
+const VmmHostConfigSchema = z.object({
+  boot: z.enum(["efi", "linux"]).optional(),
+});
+
 const SandboxConfigSchema = z.object({
   ec2: Ec2ConfigSchema.optional(),
   packages: z.record(z.string(), PackageConfigSchema),
   ports: z.array(PortForwardSchema).optional(),
-  provider: z.enum(["local", "ec2"]).optional(),
+  provider: z.enum(["local", "ec2", "vmm"]).optional(),
   send: z
     .object({
       remotePath: z.string().optional(),
@@ -37,11 +52,23 @@ const SandboxConfigSchema = z.object({
   ubuntu: z.string(),
   username: z.string().default(() => userInfo().username),
   vm: z.object({
+    arch: z.enum(["arm64", "amd64"]).optional(),
     cpus: z.number(),
     disk: z.string(),
     memory: z.string(),
   }),
+  vmm: VmmHostConfigSchema.optional(),
 });
+
+type AssertAssignable<T extends U, U> = T;
+type _SchemaMatchesSandboxConfig = AssertAssignable<
+  z.infer<typeof SandboxConfigSchema>,
+  SandboxConfig
+>;
+type _SandboxConfigMatchesSchema = AssertAssignable<
+  SandboxConfig,
+  z.infer<typeof SandboxConfigSchema>
+>;
 
 const SandboxStateSchema = z.object({
   host: z.string().trim().min(1).default("127.0.0.1"),
@@ -57,14 +84,13 @@ const SandboxStateSchema = z.object({
 
 export type PackageConfig = z.infer<typeof PackageConfigSchema>;
 export type PortForward = z.infer<typeof PortForwardSchema>;
-export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 export type SandboxState = z.infer<typeof SandboxStateSchema>;
 
 export function readSandboxConfig(cwd: string = process.cwd()): SandboxConfig {
   const p = join(cwd, "sandbox.json");
   if (!existsSync(p)) {
     console.error(
-      "No sandbox.json found in current directory. Run: create-sandbox init"
+      "No sandbox.json found in current directory. Run: sandboxctl init"
     );
     process.exit(1);
   }

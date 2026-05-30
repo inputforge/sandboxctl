@@ -22,8 +22,8 @@ export async function wizard(): Promise<void> {
 
   intro(
     isModify
-      ? `create-sandbox — modifying config for "${name}"`
-      : `create-sandbox — setting up sandbox for "${name}"`
+      ? `sandboxctl — modifying config for "${name}"`
+      : `sandboxctl — setting up sandbox for "${name}"`
   );
 
   const config = await runInitPrompts(existing);
@@ -41,7 +41,7 @@ export async function wizard(): Promise<void> {
   });
 
   if (isCancel(shouldStart) || !shouldStart) {
-    console.log("  Run: create-sandbox start");
+    console.log("  Run: sandboxctl start");
     return;
   }
 

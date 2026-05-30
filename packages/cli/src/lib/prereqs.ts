@@ -9,15 +9,6 @@ interface Prereq {
 }
 
 function getPrereqs(pc: PlatformConfig): Prereq[] {
-  if (pc.platform === "macos") {
-    return [
-      {
-        bin: "limactl",
-        installCmd: "brew install lima",
-        label: "Lima (limactl)",
-      },
-    ];
-  }
   return [
     {
       bin: pc.qemuBin,

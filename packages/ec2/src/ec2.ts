@@ -184,7 +184,7 @@ export async function ensureSecurityGroup(
   if (!groupId) {
     const created = await ec2Client.send(
       new CreateSecurityGroupCommand({
-        Description: "create-sandbox SSH access",
+        Description: "sandboxctl SSH access",
         GroupName: groupName,
       })
     );
@@ -338,7 +338,8 @@ export async function pollSshReady(
 
 export async function streamInstallLog(
   host: string,
-  identityFile: string
+  identityFile: string,
+  logLine: (line: string) => void
 ): Promise<void> {
   const child = spawn("ssh", [
     "-i",
@@ -377,7 +378,7 @@ export async function streamInstallLog(
       if (!line.trim()) {
         continue;
       }
-      console.log(`  ${line}`);
+      logLine(line);
       if (line.includes("==> Done.")) {
         seenDone = true;
         child.kill();

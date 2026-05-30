@@ -1,13 +1,15 @@
 import { execFile, execFileSync } from "node:child_process";
+import { once } from "node:events";
 import { createWriteStream, existsSync, mkdirSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { log, progress, spinner } from "@clack/prompts";
+import type { ProviderReporter, VmProvider } from "@inputforge/providers";
 
-import { buildInstallScript } from "../../installers.js";
+import { buildInstallScript } from "./installers.js";
 import {
   appDataDir,
   imagesDir,
@@ -16,19 +18,17 @@ import {
   vmImgPath,
   vmLogPath,
   vmSockPath,
-} from "../../paths.js";
-import type { PlatformConfig } from "../../platform.js";
-import { getUbuntuImageName, getUbuntuImageUrl } from "../../platform.js";
-import { findFreePort } from "../../port.js";
-import { buildSeedImage } from "../../seed.js";
-import { findSshPublicKey } from "../../ssh-key.js";
-import type { VmProvider } from "../index.js";
+} from "./paths.js";
+import type { PlatformConfig } from "./platform.js";
+import { getUbuntuImageName, getUbuntuImageUrl } from "./platform.js";
 import {
   isVmRunning,
   sendMonitorCommand,
   spawnQemu,
   waitForSockGone,
 } from "./qemu.js";
+import { buildSeedImage } from "./seed.js";
+import { findSshPublicKey } from "./ssh-key.js";
 
 function buildUserData(
   pubKey: string,
@@ -68,7 +68,8 @@ function formatProgress(downloaded: number, total: number): string {
 async function downloadFile(
   url: string,
   destPath: string,
-  label: string
+  label: string,
+  reporter: ProviderReporter
 ): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) {
@@ -76,8 +77,7 @@ async function downloadFile(
   }
 
   const total = Number(res.headers.get("content-length") ?? 0);
-  const bar = progress(total > 0 ? { max: total } : undefined);
-  bar.start(label);
+  const bar = reporter.progress(label, total > 0 ? total : undefined);
 
   let downloaded = 0;
 
@@ -102,6 +102,21 @@ async function downloadFile(
     rmSync(destPath, { force: true });
     throw error;
   }
+}
+
+async function findFreePort(start = 2222, end = 2299): Promise<number> {
+  for (let port = start; port <= end; port += 1) {
+    const server = createServer();
+    server.listen(port, "127.0.0.1");
+    try {
+      await once(server, "listening");
+      server.close();
+      return port;
+    } catch {
+      server.close();
+    }
+  }
+  throw new Error(`No free port found in range ${start}-${end}`);
 }
 
 async function pollSsh(
@@ -139,7 +154,11 @@ async function pollSsh(
   );
 }
 
-async function streamInstallLog(port: number, username: string): Promise<void> {
+async function streamInstallLog(
+  port: number,
+  username: string,
+  logLine: (line: string) => void
+): Promise<void> {
   const child = execFile("ssh", [
     "-o",
     "StrictHostKeyChecking=no",
@@ -160,7 +179,7 @@ async function streamInstallLog(port: number, username: string): Promise<void> {
       if (!line.trim()) {
         continue;
       }
-      console.log(`  ${line}`);
+      logLine(line);
       if (line.includes("==> Done.")) {
         child.kill();
         return;
@@ -172,87 +191,97 @@ async function streamInstallLog(port: number, username: string): Promise<void> {
 async function boot(
   pc: PlatformConfig,
   config: Parameters<VmProvider["start"]>[0],
+  name: string,
   port: number,
-  isFirstBoot: boolean
+  isFirstBoot: boolean,
+  reporter: ProviderReporter
 ): Promise<void> {
   {
-    const s = spinner();
-    s.start("Booting VM...");
+    const s = reporter.spin("Booting VM...");
     spawnQemu({
       cpus: config.vm.cpus,
-      logPath: vmLogPath(),
+      logPath: vmLogPath(name),
       memory: config.vm.memory,
       platform: pc,
       port,
-      seedImgPath: isFirstBoot ? seedImgPath() : null,
-      sockPath: vmSockPath(),
-      vmImgPath: vmImgPath(),
+      seedImgPath: isFirstBoot ? seedImgPath(name) : null,
+      sockPath: vmSockPath(name),
+      vmImgPath: vmImgPath(name),
     });
     s.stop("VM booting in background.");
   }
 
   {
-    const s = spinner();
-    s.start("Waiting for SSH...");
+    const s = reporter.spin("Waiting for SSH...");
     await pollSsh(port, config.username);
     s.stop("SSH ready.");
   }
 
   if (isFirstBoot) {
-    log.step("Streaming install log:");
-    await streamInstallLog(port, config.username);
+    reporter.step("Streaming install log:");
+    await streamInstallLog(port, config.username, (line) => reporter.log(line));
   }
 }
 
 async function firstBoot(
   pc: PlatformConfig,
-  config: Parameters<VmProvider["start"]>[0]
+  config: Parameters<VmProvider["start"]>[0],
+  name: string,
+  reporter: ProviderReporter
 ): Promise<number> {
-  mkdirSync(sandboxDir(), { recursive: true });
+  mkdirSync(sandboxDir(name), { recursive: true });
   mkdirSync(appDataDir, { recursive: true });
   mkdirSync(imagesDir, { recursive: true });
 
   const imgName = getUbuntuImageName(config.ubuntu, pc.ubuntuArch);
   const cachedImg = join(imagesDir, imgName);
   if (existsSync(cachedImg)) {
-    log.step("Base image already cached.");
+    reporter.step("Base image already cached.");
   } else {
     await downloadFile(
       getUbuntuImageUrl(config.ubuntu, pc.ubuntuArch),
       cachedImg,
-      `Downloading Ubuntu ${config.ubuntu} (${pc.ubuntuArch})...`
+      `Downloading Ubuntu ${config.ubuntu} (${pc.ubuntuArch})...`,
+      reporter
     );
   }
 
   {
-    const s = spinner();
-    s.start("Creating VM disk image...");
+    const s = reporter.spin("Creating VM disk image...");
     execFileSync(
       "qemu-img",
-      ["create", "-f", "qcow2", "-b", cachedImg, "-F", "qcow2", vmImgPath()],
+      [
+        "create",
+        "-f",
+        "qcow2",
+        "-b",
+        cachedImg,
+        "-F",
+        "qcow2",
+        vmImgPath(name),
+      ],
       { stdio: "ignore" }
     );
-    execFileSync("qemu-img", ["resize", vmImgPath(), config.vm.disk], {
+    execFileSync("qemu-img", ["resize", vmImgPath(name), config.vm.disk], {
       stdio: "ignore",
     });
     s.stop("Disk image created.");
   }
 
   {
-    const s = spinner();
-    s.start("Building cloud-init seed...");
+    const s = reporter.spin("Building cloud-init seed...");
     const pubKey = findSshPublicKey();
     const installScript = buildInstallScript(config.packages, pc.ubuntuArch);
     buildSeedImage(
       "instance-id: sandbox-vm-1\nlocal-hostname: sandbox-vm\n",
       buildUserData(pubKey, installScript, config.username),
-      seedImgPath()
+      seedImgPath(name)
     );
     s.stop("Seed image created.");
   }
 
   const port = await findFreePort();
-  await boot(pc, config, port, true);
+  await boot(pc, config, name, port, true, reporter);
   return port;
 }
 
@@ -260,26 +289,25 @@ async function subsequentBoot(
   pc: PlatformConfig,
   config: Parameters<VmProvider["start"]>[0],
   name: string,
-  snapshot: Parameters<VmProvider["start"]>[2]
+  snapshot: Parameters<VmProvider["start"]>[2],
+  reporter: ProviderReporter
 ): Promise<number> {
   if (snapshot) {
     if (config.ubuntu !== snapshot.ubuntu) {
-      console.error(
+      throw new Error(
         `sandbox.json "ubuntu" changed (${snapshot.ubuntu} → ${config.ubuntu}).\n` +
-          "This requires a full rebuild. Run: create-sandbox destroy && create-sandbox start"
+          "This requires a full rebuild. Run: sandboxctl destroy && sandboxctl start"
       );
-      process.exit(1);
     }
     if (JSON.stringify(config.packages) !== JSON.stringify(snapshot.packages)) {
-      console.error(
+      throw new Error(
         'sandbox.json "packages" changed.\n' +
-          "This requires a full rebuild. Run: create-sandbox destroy && create-sandbox start"
+          "This requires a full rebuild. Run: sandboxctl destroy && sandboxctl start"
       );
-      process.exit(1);
     }
   }
 
-  const running = await isVmRunning(vmSockPath());
+  const running = await isVmRunning(vmSockPath(name));
 
   if (running) {
     const diskChanged = snapshot && config.vm.disk !== snapshot.vm.disk;
@@ -288,61 +316,59 @@ async function subsequentBoot(
       (config.vm.cpus !== snapshot.vm.cpus ||
         config.vm.memory !== snapshot.vm.memory);
     if (!(snapshot && (diskChanged || vmChanged))) {
-      console.error(`Sandbox "${name}" is already running.`);
-      process.exit(1);
+      throw new Error(`Sandbox "${name}" is already running.`);
     }
-    log.step("Config changed — stopping VM to apply changes...");
-    await sendMonitorCommand(vmSockPath(), "system_powerdown");
-    await waitForSockGone(vmSockPath());
+    reporter.step("Config changed — stopping VM to apply changes...");
+    await sendMonitorCommand(vmSockPath(name), "system_powerdown");
+    await waitForSockGone(vmSockPath(name));
   }
 
   if (snapshot && config.vm.disk !== snapshot.vm.disk) {
-    const s = spinner();
-    s.start(`Resizing disk from ${snapshot.vm.disk} to ${config.vm.disk}...`);
+    const s = reporter.spin(
+      `Resizing disk from ${snapshot.vm.disk} to ${config.vm.disk}...`
+    );
     try {
-      execFileSync("qemu-img", ["resize", vmImgPath(), config.vm.disk], {
+      execFileSync("qemu-img", ["resize", vmImgPath(name), config.vm.disk], {
         stdio: "ignore",
       });
       s.stop(`Disk resized to ${config.vm.disk}.`);
     } catch {
       s.stop("Disk resize failed.");
-      console.error(
+      throw new Error(
         `Failed to resize disk from ${snapshot.vm.disk} to ${config.vm.disk}.\n` +
           "QEMU images cannot be shrunk. If you need a larger disk, set a bigger value."
       );
-      process.exit(1);
     }
   }
 
   const port = await findFreePort();
-  await boot(pc, config, port, false);
+  await boot(pc, config, name, port, false, reporter);
   return port;
 }
 
 export function createQemuProvider(pc: PlatformConfig): VmProvider {
   return {
-    destroy: async (_name) => {
-      if (await isVmRunning(vmSockPath())) {
-        console.error("Sandbox is running. Stop it first: create-sandbox stop");
-        process.exit(1);
+    destroy: async (name, _reporter) => {
+      if (await isVmRunning(vmSockPath(name))) {
+        throw new Error("Sandbox is running. Stop it first: sandboxctl stop");
       }
-      rmSync(sandboxDir(), { force: true, recursive: true });
+      rmSync(sandboxDir(name), { force: true, recursive: true });
     },
 
-    isInitialized: (_name) => existsSync(vmImgPath()),
+    isInitialized: (name) => existsSync(vmImgPath(name)),
 
-    isRunning: (_name) => isVmRunning(vmSockPath()),
+    isRunning: (name) => isVmRunning(vmSockPath(name)),
 
-    start: async (config, name, snapshot) => {
-      const port = existsSync(vmImgPath())
-        ? await subsequentBoot(pc, config, name, snapshot)
-        : await firstBoot(pc, config);
+    start: async (config, name, snapshot, reporter) => {
+      const port = existsSync(vmImgPath(name))
+        ? await subsequentBoot(pc, config, name, snapshot, reporter)
+        : await firstBoot(pc, config, name, reporter);
       return { host: "127.0.0.1", port };
     },
 
-    stop: async (_name) => {
-      await sendMonitorCommand(vmSockPath(), "system_powerdown");
-      await waitForSockGone(vmSockPath());
+    stop: async (name, _reporter) => {
+      await sendMonitorCommand(vmSockPath(name), "system_powerdown");
+      await waitForSockGone(vmSockPath(name));
     },
   };
 }
