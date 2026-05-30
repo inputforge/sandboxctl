@@ -60,6 +60,16 @@ const SandboxConfigSchema = z.object({
   vmm: VmmHostConfigSchema.optional(),
 });
 
+type AssertAssignable<T extends U, U> = T;
+type _SchemaMatchesSandboxConfig = AssertAssignable<
+  z.infer<typeof SandboxConfigSchema>,
+  SandboxConfig
+>;
+type _SandboxConfigMatchesSchema = AssertAssignable<
+  SandboxConfig,
+  z.infer<typeof SandboxConfigSchema>
+>;
+
 const SandboxStateSchema = z.object({
   host: z.string().trim().min(1).default("127.0.0.1"),
   identityFile: z.string().optional(),
