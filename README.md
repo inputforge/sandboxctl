@@ -8,6 +8,18 @@ A CLI tool that spins up a Linux sandbox VM on your machine for local developmen
 - **macOS or Linux**: QEMU — `brew install qemu` / `sudo apt install qemu-system qemu-utils`
 - **Node.js** 18+
 
+## Agent Skill
+
+sandboxctl ships an agent skill for Claude Code, Cursor, Codex, and other AI coding assistants. It analyzes your project and writes a `sandbox.json` for you — detecting runtimes, port requirements, and appropriate VM sizing automatically.
+
+Install it with:
+
+```sh
+npx skills add inputforge/sandboxctl
+```
+
+Once installed, ask your assistant: _"create a sandbox for this project"_ and it will run the full setup wizard inline.
+
 ## Quickstart
 
 Run in any project directory:
