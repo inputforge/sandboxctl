@@ -1,7 +1,7 @@
 {
-  "name": "@inputforge/providers",
+  "name": "@inputforge/sandboxctl-providers",
   "version": "0.1.0",
-  "description": "Shared provider types for Inputforge VM providers",
+  "description": "Shared provider types for sandboxctl VM providers",
   "files": [
     "dist"
   ],

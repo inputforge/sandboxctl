@@ -2,7 +2,7 @@ import type {
   SandboxConfig,
   VmProvider,
   VmStartResult,
-} from "@inputforge/providers";
+} from "@inputforge/sandboxctl-providers";
 
 import type { GlobalConfig } from "../global-config.js";
 
@@ -121,15 +121,15 @@ export async function getProvider(
       globalConfig,
       pc.ubuntuArch
     );
-    const { createEc2Provider } = await import("@inputforge/ec2");
+    const { createEc2Provider } = await import("@inputforge/sandboxctl-ec2");
     return createEc2Provider(ec2Config, ec2Config.arch);
   }
   if (provider === "vmm") {
-    const { createVmmProvider } = await import("@inputforge/vmm");
+    const { createVmmProvider } = await import("@inputforge/sandboxctl-vmm");
     return createVmmProvider();
   }
   const { createQemuProvider, getPlatformConfig } =
-    await import("@inputforge/qemu");
+    await import("@inputforge/sandboxctl-qemu");
   return createQemuProvider(getPlatformConfig());
 }
 

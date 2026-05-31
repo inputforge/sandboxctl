@@ -1,7 +1,7 @@
 {
-  "name": "@inputforge/vmm",
+  "name": "@inputforge/sandboxctl-vmm",
   "version": "0.1.0",
-  "description": "Inputforge VM provider backed by the vmm Swift binary",
+  "description": "sandboxctl VM provider backed by the vmm Swift binary",
   "files": [
     "dist"
   ],
@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@gcu/iso9660": "^0.1.0",
-    "@inputforge/providers": "0.1.0",
+    "@inputforge/sandboxctl-providers": "0.1.0",
     "env-paths": "^4.0.0"
   },
   "devDependencies": {

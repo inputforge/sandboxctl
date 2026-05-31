@@ -1,4 +1,4 @@
-import type { SandboxConfig } from "@inputforge/providers";
+import type { SandboxConfig } from "@inputforge/sandboxctl-providers";
 
 export interface VmmConfig {
   bootMode: "efi" | "linux";

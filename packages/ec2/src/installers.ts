@@ -1,4 +1,4 @@
-import type { PackageConfig } from "@inputforge/providers";
+import type { PackageConfig } from "@inputforge/sandboxctl-providers";
 
 type InstallerFn = (
   cfg: PackageConfig,

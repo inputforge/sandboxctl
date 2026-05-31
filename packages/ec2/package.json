@@ -1,7 +1,7 @@
 {
-  "name": "@inputforge/ec2",
+  "name": "@inputforge/sandboxctl-ec2",
   "version": "0.1.0",
-  "description": "Inputforge VM provider backed by AWS EC2",
+  "description": "sandboxctl VM provider backed by AWS EC2",
   "files": [
     "dist"
   ],
@@ -16,7 +16,7 @@
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.817.0",
     "@aws-sdk/client-ssm": "^3.817.0",
-    "@inputforge/providers": "0.1.0",
+    "@inputforge/sandboxctl-providers": "0.1.0",
     "env-paths": "^4.0.0"
   },
   "devDependencies": {

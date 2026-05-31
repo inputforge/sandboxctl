@@ -6,7 +6,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
 
-import type { ProgressHandle } from "@inputforge/providers";
+import type { ProgressHandle } from "@inputforge/sandboxctl-providers";
 
 const execFileAsync = promisify(execFile);
 const GZIP_HEADER_WINDOW_BYTES = 2048;

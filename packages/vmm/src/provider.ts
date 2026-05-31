@@ -17,7 +17,7 @@ import type {
   SandboxConfig,
   VmProvider,
   VmStartResult,
-} from "@inputforge/providers";
+} from "@inputforge/sandboxctl-providers";
 
 import {
   convertQcow2ToRaw,

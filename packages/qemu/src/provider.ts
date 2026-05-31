@@ -7,7 +7,10 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { ProviderReporter, VmProvider } from "@inputforge/providers";
+import type {
+  ProviderReporter,
+  VmProvider,
+} from "@inputforge/sandboxctl-providers";
 
 import { buildInstallScript } from "./installers.js";
 import {

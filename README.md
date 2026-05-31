@@ -5,8 +5,7 @@ A CLI tool that spins up a Linux sandbox VM on your machine for local developmen
 ## Requirements
 
 - **macOS or Linux** (Windows support is experimental)
-- **macOS**: Lima — `brew install lima`
-- **Linux**: QEMU — `sudo apt install qemu-system qemu-utils`
+- **macOS or Linux**: QEMU — `brew install qemu` / `sudo apt install qemu-system qemu-utils`
 - **Node.js** 18+
 
 ## Quickstart
@@ -14,7 +13,7 @@ A CLI tool that spins up a Linux sandbox VM on your machine for local developmen
 Run in any project directory:
 
 ```sh
-npx @inputforge/sandboxctl
+npx sandboxctl
 ```
 
 This launches a setup wizard that checks prerequisites, walks you through configuration, and optionally boots the VM — all in one session.
@@ -22,7 +21,7 @@ This launches a setup wizard that checks prerequisites, walks you through config
 Or install globally for day-to-day use:
 
 ```sh
-npm install -g @inputforge/sandboxctl
+npm install -g sandboxctl
 sandboxctl          # setup wizard
 sandboxctl ssh      # shell inside the VM
 ```

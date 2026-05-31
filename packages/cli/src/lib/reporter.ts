@@ -3,7 +3,7 @@ import type {
   ProgressHandle,
   ProviderReporter,
   SpinnerHandle,
-} from "@inputforge/providers";
+} from "@inputforge/sandboxctl-providers";
 
 export function createReporter(): ProviderReporter {
   return {

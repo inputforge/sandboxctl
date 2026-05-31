@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { PackageConfig } from "@inputforge/providers";
+import type { PackageConfig } from "@inputforge/sandboxctl-providers";
 
 const USERNAME_RE = /^[A-Za-z0-9_-]+$/u;
 

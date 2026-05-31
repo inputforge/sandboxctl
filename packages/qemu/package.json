@@ -1,7 +1,7 @@
 {
-  "name": "@inputforge/qemu",
+  "name": "@inputforge/sandboxctl-qemu",
   "version": "0.1.0",
-  "description": "Inputforge VM provider backed by QEMU",
+  "description": "sandboxctl VM provider backed by QEMU",
   "files": [
     "dist"
   ],
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@gcu/iso9660": "^0.1.0",
-    "@inputforge/providers": "0.1.0",
+    "@inputforge/sandboxctl-providers": "0.1.0",
     "env-paths": "^4.0.0"
   },
   "devDependencies": {

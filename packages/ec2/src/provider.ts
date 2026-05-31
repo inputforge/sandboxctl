@@ -12,7 +12,7 @@ import type {
   ProviderReporter,
   SandboxConfig,
   VmProvider,
-} from "@inputforge/providers";
+} from "@inputforge/sandboxctl-providers";
 
 import { buildUserData } from "./cloud-init.js";
 import type { Ec2InstanceState } from "./ec2.js";

@@ -2,12 +2,12 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { userInfo } from "node:os";
 import { basename, join } from "node:path";
 
-import type { SandboxConfig } from "@inputforge/providers";
+import type { SandboxConfig } from "@inputforge/sandboxctl-providers";
 import { z } from "zod";
 
 import { configSnapshotPath, stateJsonPath } from "./paths.js";
 
-export type { SandboxConfig } from "@inputforge/providers";
+export type { SandboxConfig } from "@inputforge/sandboxctl-providers";
 
 const PACKAGE_VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z.+_-]*$/u;
 
