@@ -13,6 +13,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 
 import type {
+  PrereqResult,
   ProviderReporter,
   SandboxConfig,
   VmProvider,
@@ -49,7 +50,20 @@ import { buildInstallScript, buildSeedImage, buildUserData } from "./seed.js";
 import { resolveVmmBinary } from "./vmm-binary.js";
 import { buildEfiVmmConfig, buildLinuxVmmConfig } from "./vmm-config.js";
 
+const VMM_MIN_MACOS = 13;
+
 const execFileAsync = promisify(execFile);
+
+function macOsMajorVersion(): number {
+  try {
+    const raw = execFileSync("sw_vers", ["-productVersion"], {
+      encoding: "utf-8",
+    }).trim();
+    return Number(raw.split(".")[0]);
+  } catch {
+    return 0;
+  }
+}
 const ARP_LINE_RE = /\(([^)]+)\) at ([0-9a-f:]+)/iu;
 
 function normalizeMac(mac: string): string {
@@ -376,6 +390,13 @@ function subsequentBoot(
 
 export function createVmmProvider(): VmProvider {
   return {
+    checkPrereqs(): void {
+      const [result] = this.reportPrereqs();
+      if (result && !result.ok) {
+        throw new Error(result.installCmd);
+      }
+    },
+
     destroy: (name, _reporter) => {
       if (isVmmRunning(vmmPidPath(name))) {
         throw new Error("Sandbox is running. Stop it first: sandboxctl stop");
@@ -387,6 +408,21 @@ export function createVmmProvider(): VmProvider {
     isInitialized: (name) => existsSync(vmRawDiskPath(name)),
 
     isRunning: (name) => Promise.resolve(isVmmRunning(vmmPidPath(name))),
+
+    isSupported(): boolean {
+      return process.platform === "darwin";
+    },
+
+    reportPrereqs(): PrereqResult[] {
+      const major = macOsMajorVersion();
+      return [
+        {
+          installCmd: `Upgrade to macOS ${VMM_MIN_MACOS} (Ventura) or later`,
+          label: `macOS ${VMM_MIN_MACOS}+ (detected: ${major || "unknown"})`,
+          ok: major >= VMM_MIN_MACOS,
+        },
+      ];
+    },
 
     start: (config, name, snapshot, reporter) => {
       const vmmBin = resolveVmmBinary();

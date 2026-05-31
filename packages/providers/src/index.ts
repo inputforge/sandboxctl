@@ -21,7 +21,17 @@ export interface ProviderReporter {
   log(line: string): void;
 }
 
+export interface PrereqResult {
+  installCmd: string;
+  label: string;
+  ok: boolean;
+}
+
 export interface VmProvider {
+  /** Whether this provider can run on the current host at all. If false, skip prereq checks entirely. */
+  isSupported(): boolean;
+  checkPrereqs(): void;
+  reportPrereqs(): PrereqResult[];
   /** Fast, synchronous local existence check (e.g. filesystem). Must not perform network I/O. */
   isInitialized(name: string): boolean;
   /** Asynchronous runtime liveness probe (e.g. PID check, API call). Use when true running state is needed. */

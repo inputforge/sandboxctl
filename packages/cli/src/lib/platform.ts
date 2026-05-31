@@ -28,7 +28,7 @@ export function getPlatformConfig(): PlatformConfig {
     return {
       arch: isArm ? "arm64" : "x86_64",
       platform: "macos",
-      provider: isArm ? "vmm" : "qemu",
+      provider: "vmm",
       qemuBin: isArm ? "qemu-system-aarch64" : "qemu-system-x86_64",
       ubuntuArch: isArm ? "arm64" : "amd64",
     };

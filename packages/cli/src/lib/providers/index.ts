@@ -16,6 +16,7 @@ interface Ec2Config {
 export type ResolvedProvider = "ec2" | "qemu" | "vmm";
 
 interface PlatformHint {
+  platform: "macos" | "linux" | "windows";
   provider: "qemu" | "vmm";
   ubuntuArch: "arm64" | "amd64";
 }
@@ -81,12 +82,6 @@ function mergeEc2Config(
   };
 }
 
-export function providerNeedsLocalPrerequisites(
-  provider: ResolvedProvider
-): boolean {
-  return provider === "qemu";
-}
-
 export function resolveProvider(
   sandboxConfig: SandboxConfig,
   globalConfig: GlobalConfig,
@@ -97,8 +92,11 @@ export function resolveProvider(
   const provider =
     configuredProvider === "local" ? pc.provider : configuredProvider;
 
-  // vmm only supports native arch — fall back to qemu for cross-arch requests
   if (provider === "vmm") {
+    if (pc.platform !== "macos") {
+      throw new Error(`The "vmm" provider is only supported on macOS.`);
+    }
+    // vmm only supports native arch — fall back to qemu for cross-arch requests
     const guestArch = sandboxConfig.vm.arch ?? pc.ubuntuArch;
     if (guestArch !== pc.ubuntuArch) {
       return "qemu";
@@ -125,6 +123,18 @@ export async function getProvider(
     return createEc2Provider(ec2Config, ec2Config.arch);
   }
   if (provider === "vmm") {
+    const { createVmmProvider } = await import("@inputforge/sandboxctl-vmm");
+    return createVmmProvider();
+  }
+  const { createQemuProvider, getPlatformConfig } =
+    await import("@inputforge/sandboxctl-qemu");
+  return createQemuProvider(getPlatformConfig());
+}
+
+export async function getPlatformProvider(
+  pc: PlatformHint
+): Promise<VmProvider> {
+  if (pc.provider === "vmm") {
     const { createVmmProvider } = await import("@inputforge/sandboxctl-vmm");
     return createVmmProvider();
   }
