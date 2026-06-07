@@ -55,6 +55,9 @@ jobs:
           SIGN_IDENTITY: ${{ secrets.APPLE_SIGN_IDENTITY }}
         run: npm run build --workspaces --if-present
 
+      - name: Pack npm tarballs
+        run: npm pack --workspaces
+
       - name: Create pre-release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -63,7 +66,8 @@ jobs:
             --prerelease \
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
-            packages/vmm/dist/vmm
+            packages/vmm/dist/vmm \
+            ./*.tgz
 
       - name: Cleanup keychain
         if: always()
