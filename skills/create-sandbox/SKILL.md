@@ -13,7 +13,7 @@ triggers:
 
 # create-sandbox
 
-Analyze the current project and write a `sandbox.json` for [sandboxctl](https://github.com/inputforge/create-sandbox), which boots a local Linux VM for development.
+Analyze the current project and write a `sandbox.json` for [sandboxctl](https://github.com/inputforge/sandboxctl), which boots a local Linux VM for development.
 
 ## Workflow
 
@@ -24,6 +24,13 @@ Detect the host platform and architecture:
 ```bash
 uname -s   # Darwin = macOS, Linux = Linux
 uname -m   # arm64 = Apple Silicon / ARM Linux, x86_64 = Intel/AMD
+```
+
+On Windows, use PowerShell instead:
+
+```powershell
+$env:OS                      # Windows_NT = Windows
+$env:PROCESSOR_ARCHITECTURE  # AMD64 = x86_64, ARM64 = arm64
 ```
 
 Determine the provider and what to check:
@@ -186,7 +193,7 @@ Stream the output inline. The VM is ready when provisioning completes and SSH is
 
 If no, show:
 
-```
+```text
 Next steps:
   sandboxctl start   # boot the VM
   sandboxctl ssh     # open a shell inside the VM
