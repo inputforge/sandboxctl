@@ -43,13 +43,6 @@ jobs:
       - run: npm ci
         env:
           npm_config_force: "true"
-      - name: Build (non-vmm packages)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          npm run build -w packages/providers
-          npm run build -w packages/ec2
-          npm run build -w packages/qemu
-          npm run build -w packages/cli
       - name: Import signing certificate
         if: matrix.os == 'macos-latest' && github.ref == 'refs/heads/main'
         env:
@@ -74,8 +67,7 @@ jobs:
             -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-      - name: Build (all packages)
-        if: matrix.os == 'macos-latest'
+      - name: Build
         env:
           # Ad-hoc signing for PRs; real identity injected on main via keychain setup above
           SIGN_IDENTITY: ${{ github.ref == 'refs/heads/main' && secrets.APPLE_SIGN_IDENTITY || '-' }}
