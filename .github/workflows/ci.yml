@@ -39,7 +39,7 @@ jobs:
       - name: Install actionlint
         run: |
           curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash \
-            | bash -s -- v1.7.12
+            | bash -s -- 1.7.12
           echo "$GITHUB_WORKSPACE" >> "$GITHUB_PATH"
       - name: Run actionlint
         run: actionlint
