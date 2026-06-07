@@ -25,6 +25,25 @@ jobs:
           npm_config_force: "true"
       - run: npm run check
 
+  lint-workflows:
+    name: Lint Workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Install zizmor
+        run: pip install zizmor --quiet
+      - name: Run zizmor
+        run: zizmor .github/workflows/
+      - name: Install actionlint
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash \
+            | bash -s -- v1.7.12
+          echo "$GITHUB_WORKSPACE" >> "$GITHUB_PATH"
+      - name: Run actionlint
+        run: actionlint
+
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
