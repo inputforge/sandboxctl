@@ -54,10 +54,10 @@ If major version < 13, abort: "vmm requires macOS 13 (Ventura) or later."
 **local/QEMU (Linux):** Check QEMU is installed:
 
 ```bash
-which qemu-system-aarch64 || which qemu-system-x86_64
+(which qemu-system-aarch64 || which qemu-system-x86_64) && which qemu-img
 ```
 
-If missing, ask the user to confirm, then run `sudo apt install qemu-system qemu-utils`. Re-check after installation. If the user declines, exit.
+If either binary is missing, ask the user to confirm, then run `sudo apt install qemu-system qemu-utils`. Re-check both binaries after installation. If the user declines, exit.
 
 ### Step 2: Check for existing config
 
