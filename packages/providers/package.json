@@ -2,6 +2,23 @@
   "name": "@inputforge/sandboxctl-providers",
   "version": "0.1.0",
   "description": "Shared provider types for sandboxctl VM providers",
+  "keywords": [
+    "provider",
+    "sandbox",
+    "virtualization",
+    "vm"
+  ],
+  "homepage": "https://github.com/inputforge/sandboxctl",
+  "bugs": {
+    "url": "https://github.com/inputforge/sandboxctl/issues"
+  },
+  "license": "MIT",
+  "author": "Input Forge <contact@inputforge.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inputforge/sandboxctl",
+    "directory": "packages/providers"
+  },
   "files": [
     "dist"
   ],
@@ -15,5 +32,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

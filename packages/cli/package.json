@@ -2,6 +2,24 @@
   "name": "sandboxctl",
   "version": "0.1.0",
   "description": "Create and manage Linux sandbox VMs for development",
+  "keywords": [
+    "development",
+    "linux",
+    "sandbox",
+    "virtualization",
+    "vm"
+  ],
+  "homepage": "https://github.com/inputforge/sandboxctl",
+  "bugs": {
+    "url": "https://github.com/inputforge/sandboxctl/issues"
+  },
+  "license": "MIT",
+  "author": "Input Forge <contact@inputforge.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inputforge/sandboxctl",
+    "directory": "packages/cli"
+  },
   "bin": {
     "sandboxctl": "./dist/index.js"
   },
@@ -28,5 +46,8 @@
     "@inputforge/sandboxctl-ec2": "0.1.0",
     "@inputforge/sandboxctl-qemu": "0.1.0",
     "@inputforge/sandboxctl-vmm": "0.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

@@ -2,6 +2,24 @@
   "name": "@inputforge/sandboxctl-qemu",
   "version": "0.1.0",
   "description": "sandboxctl VM provider backed by QEMU",
+  "keywords": [
+    "linux",
+    "qemu",
+    "sandbox",
+    "virtualization",
+    "vm"
+  ],
+  "homepage": "https://github.com/inputforge/sandboxctl",
+  "bugs": {
+    "url": "https://github.com/inputforge/sandboxctl/issues"
+  },
+  "license": "MIT",
+  "author": "Input Forge <contact@inputforge.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inputforge/sandboxctl",
+    "directory": "packages/qemu"
+  },
   "files": [
     "dist"
   ],
@@ -20,5 +38,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
