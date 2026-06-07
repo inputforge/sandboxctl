@@ -9,6 +9,7 @@ import {
 import { EC2Client } from "@aws-sdk/client-ec2";
 import { SSMClient } from "@aws-sdk/client-ssm";
 import type {
+  PrereqResult,
   ProviderReporter,
   SandboxConfig,
   VmProvider,
@@ -98,6 +99,10 @@ export function createEc2Provider(
   arch: "arm64" | "amd64"
 ): VmProvider {
   return {
+    checkPrereqs(): void {
+      // EC2 prerequisites (credentials, region) are validated at start time by the SDK
+    },
+
     destroy: async (name, reporter) => {
       const region = requireRegion(providerConfig);
       const state = readEc2State(name);
@@ -128,6 +133,14 @@ export function createEc2Provider(
       const { ec2Client } = createClients(region);
       const instance = await describeInstance(ec2Client, state.instanceId);
       return instance.state === "running";
+    },
+
+    isSupported(): boolean {
+      return true;
+    },
+
+    reportPrereqs(): PrereqResult[] {
+      return [];
     },
 
     start: async (

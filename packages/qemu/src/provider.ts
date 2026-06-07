@@ -8,6 +8,7 @@ import { pipeline } from "node:stream/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type {
+  PrereqResult,
   ProviderReporter,
   VmProvider,
 } from "@inputforge/sandboxctl-providers";
@@ -349,8 +350,33 @@ async function subsequentBoot(
   return port;
 }
 
+function isAvailable(bin: string): boolean {
+  try {
+    execFileSync("which", [bin], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function qemuInstallCmd(pc: PlatformConfig): string {
+  return pc.platform === "macos"
+    ? "brew install qemu"
+    : "sudo apt install qemu-system qemu-utils";
+}
+
 export function createQemuProvider(pc: PlatformConfig): VmProvider {
   return {
+    checkPrereqs(): void {
+      const missing = this.reportPrereqs().filter((r) => !r.ok);
+      if (missing.length > 0) {
+        const lines = missing
+          .map((r) => `  ${r.label}\n    Install: ${r.installCmd}`)
+          .join("\n");
+        throw new Error(`Missing QEMU prerequisites:\n${lines}`);
+      }
+    },
+
     destroy: async (name, _reporter) => {
       if (await isVmRunning(vmSockPath(name))) {
         throw new Error("Sandbox is running. Stop it first: sandboxctl stop");
@@ -361,6 +387,26 @@ export function createQemuProvider(pc: PlatformConfig): VmProvider {
     isInitialized: (name) => existsSync(vmImgPath(name)),
 
     isRunning: (name) => isVmRunning(vmSockPath(name)),
+
+    isSupported(): boolean {
+      return true;
+    },
+
+    reportPrereqs(): PrereqResult[] {
+      const installCmd = qemuInstallCmd(pc);
+      return [
+        {
+          installCmd,
+          label: `QEMU (${pc.qemuBin})`,
+          ok: isAvailable(pc.qemuBin),
+        },
+        {
+          installCmd,
+          label: "QEMU disk tools (qemu-img)",
+          ok: isAvailable("qemu-img"),
+        },
+      ];
+    },
 
     start: async (config, name, snapshot, reporter) => {
       const port = existsSync(vmImgPath(name))

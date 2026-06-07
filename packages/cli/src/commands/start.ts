@@ -3,12 +3,7 @@ import { intro, outro, spinner } from "@clack/prompts";
 import { readGlobalConfig } from "../lib/global-config.js";
 import { sandboxName } from "../lib/paths.js";
 import { getPlatformConfig } from "../lib/platform.js";
-import { checkPrerequisites } from "../lib/prereqs.js";
-import {
-  getProvider,
-  providerNeedsLocalPrerequisites,
-  resolveProvider,
-} from "../lib/providers/index.js";
+import { getProvider } from "../lib/providers/index.js";
 import { createReporter } from "../lib/reporter.js";
 import {
   readConfigSnapshot,
@@ -24,12 +19,10 @@ export async function start(): Promise<void> {
   const config = readSandboxConfig();
   const globalConfig = readGlobalConfig();
   const pc = getPlatformConfig();
-  if (
-    providerNeedsLocalPrerequisites(resolveProvider(config, globalConfig, pc))
-  ) {
-    checkPrerequisites(pc);
-  }
   const provider = await getProvider(config, globalConfig, pc);
+  if (provider.isSupported()) {
+    provider.checkPrereqs();
+  }
   const snapshot = readConfigSnapshot();
 
   intro(`sandboxctl — starting "${name}"`);

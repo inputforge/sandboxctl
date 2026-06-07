@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { confirm, intro, isCancel, outro } from "@clack/prompts";
 
 import { getPlatformConfig } from "../lib/platform.js";
-import { checkPrerequisites } from "../lib/prereqs.js";
+import { getPlatformProvider } from "../lib/providers/index.js";
 import {
   readSandboxConfigOptional,
   writeSandboxConfig,
@@ -14,8 +14,10 @@ import { start } from "./start.js";
 export async function wizard(): Promise<void> {
   const name = basename(process.cwd());
   const pc = getPlatformConfig();
-
-  checkPrerequisites(pc);
+  const platformProvider = await getPlatformProvider(pc);
+  if (platformProvider.isSupported()) {
+    platformProvider.checkPrereqs();
+  }
 
   const existing = readSandboxConfigOptional();
   const isModify = existing !== null;
