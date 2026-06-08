@@ -43,13 +43,13 @@ export function spawnQemu(opts: QemuStartOptions): void {
     memory,
   ];
 
-  if (pc.firmware) {
+  if (pc.firmware !== null) {
     args.push("-drive", `if=pflash,format=raw,readonly=on,file=${pc.firmware}`);
   }
 
   args.push("-drive", `if=virtio,format=qcow2,file=${vmImgPath}`);
 
-  if (seedImgPath) {
+  if (seedImgPath !== null) {
     args.push("-drive", `if=virtio,format=raw,file=${seedImgPath},readonly=on`);
   }
 

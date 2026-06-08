@@ -34,8 +34,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc && if [ \"$(uname)\" = \"Darwin\" ]; then make -C src-native sign && cp src-native/.build/apple/Products/Release/vmm dist/vmm; fi",
-    "dev": "tsc --watch"
+    "build": "tsc && if [ \"$(uname)\" = \"Darwin\" ]; then make -C src-native sign && cp src-native/.build/apple/Products/Release/vmm dist/vmm; fi"
   },
   "dependencies": {
     "@gcu/iso9660": "^0.1.0",
@@ -43,7 +42,8 @@
     "env-paths": "^4.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "typescript": "^6.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

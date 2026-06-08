@@ -12,12 +12,14 @@ import type {
   PrereqResult,
   ProviderReporter,
   SandboxConfig,
+  SandboxHandle,
   VmProvider,
 } from "@inputforge/sandboxctl-providers";
 
 import { buildUserData } from "./cloud-init.js";
 import type { Ec2InstanceState } from "./ec2.js";
 import {
+  Ec2InstanceStateSchema,
   deleteKeyPair,
   deleteSecurityGroup,
   describeInstance,
@@ -76,7 +78,9 @@ function readEc2State(name: string): Ec2InstanceState | null {
     return null;
   }
   try {
-    return JSON.parse(readFileSync(path, "utf-8")) as Ec2InstanceState;
+    return Ec2InstanceStateSchema.parse(
+      JSON.parse(readFileSync(path, "utf-8"))
+    );
   } catch {
     return null;
   }
@@ -143,6 +147,20 @@ export function createEc2Provider(
       return [];
     },
 
+    resolve: async (name): Promise<SandboxHandle | null> => {
+      const region = requireRegion(providerConfig);
+      const state = readEc2State(name);
+      if (!state) {
+        return null;
+      }
+      const { ec2Client } = createClients(region);
+      const instance = await describeInstance(ec2Client, state.instanceId);
+      if (instance.state !== "running" || !instance.publicIpAddress) {
+        return null;
+      }
+      return { host: instance.publicIpAddress, port: 22 };
+    },
+
     start: async (
       config: SandboxConfig,
       name: string,
@@ -185,7 +203,7 @@ export function createEc2Provider(
         await pollSshReady(publicIp, privateKeyPath);
         ssh.stop("SSH ready.");
 
-        return { host: publicIp, identityFile: privateKeyPath, port: 22 };
+        return { host: publicIp, port: 22 };
       }
 
       mkdirSync(sandboxDir(name), { recursive: true });
@@ -225,6 +243,7 @@ export function createEc2Provider(
         instanceId,
         keyPairName,
         securityGroupId,
+        version: 1,
       });
       const publicIp = requirePublicIp(
         await waitForState(ec2Client, instanceId, "running"),
@@ -237,11 +256,11 @@ export function createEc2Provider(
       ssh.stop("SSH ready.");
 
       reporter.step("Streaming install log:");
-      await streamInstallLog(publicIp, privateKeyPath, (line) =>
-        reporter.log(line)
-      );
+      await streamInstallLog(publicIp, privateKeyPath, (line) => {
+        reporter.log(line);
+      });
 
-      return { host: publicIp, identityFile: privateKeyPath, port: 22 };
+      return { host: publicIp, port: 22 };
     },
 
     stop: async (name, reporter) => {

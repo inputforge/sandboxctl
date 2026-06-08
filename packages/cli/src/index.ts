@@ -18,7 +18,8 @@ const args = parse(process.argv.slice(2), {
   boolean: ["help"],
 });
 
-const command = args._[0] as string | undefined;
+const [rawCommand] = args._;
+const command = typeof rawCommand === "string" ? rawCommand : undefined;
 
 if (args.help) {
   console.log(`
@@ -47,10 +48,15 @@ if (!command) {
   process.exit(0);
 }
 
+if (command === "forward") {
+  const [, raw] = args._;
+  forward(typeof raw === "string" ? raw : undefined);
+  process.exit(0);
+}
+
 const commands: Record<string, () => Promise<unknown>> = {
   destroy,
-  doctor: () => Promise.resolve(doctor()),
-  forward: () => Promise.resolve(forward(args._[1] as string | undefined)),
+  doctor,
   init,
   receive,
   send,

@@ -31,17 +31,18 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "tsc"
   },
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.817.0",
     "@aws-sdk/client-ssm": "^3.817.0",
     "@inputforge/sandboxctl-providers": "0.2.0",
-    "env-paths": "^4.0.0"
+    "env-paths": "^4.0.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "typescript": "^6.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

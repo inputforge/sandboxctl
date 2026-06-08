@@ -1,14 +1,12 @@
-import { execFile, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { createWriteStream, promises as fsp } from "node:fs";
 import { rm } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { promisify } from "node:util";
 
 import type { ProgressHandle } from "@inputforge/sandboxctl-providers";
 
-const execFileAsync = promisify(execFile);
 const GZIP_HEADER_WINDOW_BYTES = 2048;
 const GZIP_DEFLATE_METHOD = 0x08;
 const GZIP_RESERVED_FLAG_START = 0x20;
@@ -91,15 +89,18 @@ async function downloadFile(
   destPath: string,
   bar: ProgressHandle
 ): Promise<void> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} downloading ${url}`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} downloading ${url}`);
+  }
+  if (response.body === null) {
+    throw new Error(`Response body is null for ${url}`);
   }
 
+  const total = Number(response.headers.get("content-length") ?? 0);
   let downloaded = 0;
-  const total = Number(res.headers.get("content-length") ?? 0);
 
-  async function* trackProgress(source: AsyncIterable<Buffer>) {
+  async function* trackProgress(source: AsyncIterable<Uint8Array>) {
     for await (const chunk of source) {
       downloaded += chunk.length;
       bar.advance(chunk.length, formatProgress(downloaded, total));
@@ -109,11 +110,7 @@ async function downloadFile(
 
   try {
     const file = createWriteStream(destPath);
-    await pipeline(
-      Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
-      trackProgress,
-      file
-    );
+    await pipeline(Readable.fromWeb(response.body), trackProgress, file);
     bar.stop("Downloaded.");
   } catch (error) {
     bar.stop("Download failed.");
@@ -122,7 +119,7 @@ async function downloadFile(
   }
 }
 
-async function spawnToFile(
+export async function spawnToFile(
   cmd: string,
   args: string[],
   destPath: string,
@@ -130,24 +127,21 @@ async function spawnToFile(
 ): Promise<void> {
   const out = createWriteStream(destPath);
   const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "ignore"] });
-  const close = once(child, "close") as Promise<[number | null]>;
-  const waitForError = async (): Promise<never> => {
-    const [cause] = await once(child, "error");
-    throw cause;
-  };
-  const exit = Promise.race([close, waitForError()]);
 
-  const [, [exitCode]] = await Promise.all([
-    pipeline(child.stdout as Readable, out),
-    exit,
-  ]);
-  if (
-    exitCode !== null &&
-    exitCode !== 0 &&
-    !allowedExitCodes.includes(exitCode)
-  ) {
-    throw new Error(`${cmd} exited with code ${exitCode}`);
-  }
+  await new Promise<void>((resolve, reject) => {
+    child.on("error", (err) => {
+      reject(new Error(`${cmd} process error`, { cause: err }));
+    });
+    child.on("close", (code) => {
+      if (code !== 0 && !allowedExitCodes.includes(code ?? -1)) {
+        reject(new Error(`${cmd} exited with code ${code}`));
+      } else {
+        resolve();
+      }
+    });
+  }).finally(() => {
+    out.close();
+  });
 }
 
 async function extractKernel(
@@ -220,14 +214,20 @@ export async function downloadUbuntuInitrd(
   await downloadFile(url, destPath, bar);
 }
 
+async function runQuiet(cmd: string, args: string[]): Promise<void> {
+  const child = spawn(cmd, args, { stdio: "ignore" });
+  await once(child, "close");
+  if (child.exitCode !== null && child.exitCode !== 0) {
+    throw new Error(`${cmd} exited with code ${child.exitCode}`);
+  }
+}
+
 export async function convertQcow2ToRaw(
   vmmBin: string,
   src: string,
   dest: string
 ): Promise<void> {
-  await execFileAsync(vmmBin, ["disk", "convert", src, dest], {
-    stdio: "ignore",
-  } as never);
+  await runQuiet(vmmBin, ["disk", "convert", src, dest]);
 }
 
 export async function resizeRaw(
@@ -235,7 +235,5 @@ export async function resizeRaw(
   path: string,
   size: string
 ): Promise<void> {
-  await execFileAsync(vmmBin, ["disk", "resize", path, size], {
-    stdio: "ignore",
-  } as never);
+  await runQuiet(vmmBin, ["disk", "resize", path, size]);
 }

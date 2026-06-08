@@ -28,8 +28,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "tsc"
   },
   "dependencies": {
     "@bomb.sh/args": "^0.3.1",
@@ -39,7 +38,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "typescript": "^6.0.0"
   },
   "optionalDependencies": {
     "@inputforge/sandboxctl-ec2": "0.2.0",

@@ -12,6 +12,7 @@ import {
   writeState,
 } from "../lib/sandbox.js";
 import { buildSshTransport } from "../lib/ssh-command.js";
+import { findSshKeyPair } from "../lib/ssh-key.js";
 import { send } from "./send.js";
 
 export async function start(): Promise<void> {
@@ -28,12 +29,8 @@ export async function start(): Promise<void> {
   intro(`sandboxctl — starting "${name}"`);
 
   const reporter = createReporter();
-  const { host, identityFile, port } = await provider.start(
-    config,
-    name,
-    snapshot,
-    reporter
-  );
+  const { host, port } = await provider.start(config, name, snapshot, reporter);
+  const { privateKeyPath: identityFile } = findSshKeyPair();
 
   writeState({ host, identityFile, port, startedAt: new Date().toISOString() });
   writeConfigSnapshot(config);

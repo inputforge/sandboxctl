@@ -5,7 +5,7 @@ type InstallerFn = (
   ubuntuArch: "arm64" | "amd64"
 ) => string[];
 
-const installers: Record<string, InstallerFn> = {
+const installers: Partial<Record<string, InstallerFn>> = {
   bun({ version = "latest" }, ubuntuArch) {
     const linuxArch = ubuntuArch === "arm64" ? "aarch64" : "x64";
     const tag = version === "latest" ? "latest" : `bun-v${version}`;
@@ -114,7 +114,7 @@ export function buildInstallScript(
       continue;
     }
     const builder = installers[name];
-    if (!builder) {
+    if (builder === undefined) {
       continue;
     }
     lines.push(...builder(cfg, ubuntuArch), "");

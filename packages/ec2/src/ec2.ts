@@ -26,12 +26,16 @@ import type {
   GetParameterCommandOutput,
   SSMClient as SSMClientType,
 } from "@aws-sdk/client-ssm";
+import { z } from "zod";
 
-export interface Ec2InstanceState {
-  instanceId: string;
-  keyPairName: string;
-  securityGroupId: string;
-}
+export const Ec2InstanceStateSchema = z.object({
+  instanceId: z.string(),
+  keyPairName: z.string(),
+  securityGroupId: z.string(),
+  version: z.number().int().positive().default(1),
+});
+
+export type Ec2InstanceState = z.infer<typeof Ec2InstanceStateSchema>;
 
 export interface LaunchInstanceOptions {
   amiId: string;
@@ -246,6 +250,7 @@ export async function launchInstance(
   const res = await ec2Client.send(
     new RunInstancesCommand({
       ImageId: opts.amiId,
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- string validated at config parse time; AWS rejects invalid values
       InstanceType: opts.instanceType as _InstanceType,
       KeyName: opts.keyPairName,
       MaxCount: 1,
@@ -353,49 +358,13 @@ export async function streamInstallLog(
     `ubuntu@${host}`,
     "until [ -f /var/log/install-tools.log ]; do sleep 2; done; tail -f /var/log/install-tools.log",
   ]);
-  let seenDone = false;
-  let stdoutBuffer = "";
-  let stderr = "";
 
-  const closePromise = once(child, "close") as Promise<
-    [number | null, NodeJS.Signals | null]
-  >;
-  const errorPromise = (async () => {
-    const [error] = await once(child, "error");
-    throw error instanceof Error ? error : new Error(String(error));
-  })();
-  const stderrDone = (async () => {
-    for await (const chunk of child.stderr) {
-      stderr += (chunk as Buffer).toString();
-    }
-  })();
-
-  for await (const chunk of child.stdout) {
-    stdoutBuffer += (chunk as Buffer).toString();
-    const lines = stdoutBuffer.split("\n");
-    stdoutBuffer = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.trim()) {
-        continue;
-      }
+  child.stdout.setEncoding("utf-8");
+  child.stdout.on("data", (data: string) => {
+    for (const line of data.split("\n")) {
       logLine(line);
-      if (line.includes("==> Done.")) {
-        seenDone = true;
-        child.kill();
-        break;
-      }
     }
-    if (seenDone) {
-      break;
-    }
-  }
+  });
 
-  const [code, signal] = await Promise.race([closePromise, errorPromise]);
-  await stderrDone;
-  if (!seenDone) {
-    const detail = stderr.trim() ? ` stderr: ${stderr.trim()}` : "";
-    throw new Error(
-      `Install log stream ended before completion marker. Exit code: ${code ?? "unknown"}, signal: ${signal ?? "none"}.${detail}`
-    );
-  }
+  await once(child, "close");
 }
