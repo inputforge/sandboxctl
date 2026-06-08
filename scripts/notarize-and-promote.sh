@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Notarize the vmm binary from a pre-release and promote it to a full release.
-# Promoting the release triggers the publish.yml workflow which publishes to npm.
+# Notarize the vmm binary from the staged npm package and approve all staged packages.
 #
 # Usage: ./scripts/notarize-and-promote.sh [tag]
 #
@@ -14,19 +13,48 @@ set -euo pipefail
 #       --issuer <ISSUER_ID>
 
 TAG=${1:-$(git describe --tags --abbrev=0)}
+VERSION=${TAG#v}
 SUBMISSION_FILE=".notarization-${TAG}"
 WORK_DIR=$(mktemp -d)
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 NOTARY_ARGS=(--keychain-profile "sandboxctl")
 
+# Fetch staged packages and find those matching this release version
+echo "Fetching staged packages..."
+STAGED=$(npm stage list --json)
+
+VMM_ID=$(echo "$STAGED" | python3 -c "
+import sys, json
+pkgs = json.load(sys.stdin)
+for p in pkgs:
+    if p['packageName'] == '@inputforge/sandboxctl-vmm' and p['version'] == '$VERSION':
+        print(p['id'])
+        break
+")
+
+if [[ -z "$VMM_ID" ]]; then
+  echo "error: no staged @inputforge/sandboxctl-vmm@$VERSION found" >&2
+  echo "Run 'npm stage list' to see what is currently staged." >&2
+  exit 1
+fi
+
+ALL_IDS=$(echo "$STAGED" | python3 -c "
+import sys, json
+pkgs = json.load(sys.stdin)
+for p in pkgs:
+    if p['version'] == '$VERSION':
+        print(p['id'])
+")
+
 # Submit for notarization (skip if we already have a submission ID)
 if [[ -f "$SUBMISSION_FILE" ]]; then
   SUBMISSION_ID=$(cat "$SUBMISSION_FILE")
   echo "Resuming existing submission: $SUBMISSION_ID"
 else
-  echo "Downloading vmm binary from $TAG..."
-  gh release download "$TAG" --pattern "vmm" --output "$WORK_DIR/vmm"
+  echo "Downloading staged vmm tarball (id: $VMM_ID)..."
+  npm stage download "$VMM_ID" --output "$WORK_DIR/vmm.tgz"
+  tar -xzf "$WORK_DIR/vmm.tgz" -C "$WORK_DIR" --strip-components=2 package/dist/vmm
   chmod +x "$WORK_DIR/vmm"
 
   echo "Creating zip for notarization..."
@@ -62,8 +90,10 @@ if [[ "$STATUS" != "Accepted" ]]; then
   exit 1
 fi
 
-echo "Notarization accepted! Promoting $TAG to full release..."
-gh release edit "$TAG" --prerelease=false --latest
+echo "Notarization accepted! Approving all staged packages for $TAG..."
+while IFS= read -r id; do
+  npm stage approve "$id"
+done <<< "$ALL_IDS"
 
 rm -f "$SUBMISSION_FILE"
-echo "Done! $TAG is live. The publish workflow will push to npm shortly."
+echo "Done! $TAG packages are now live on npm."
