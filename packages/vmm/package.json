@@ -1,6 +1,6 @@
 {
   "name": "@inputforge/sandboxctl-vmm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "sandboxctl VM provider backed by the vmm Swift binary",
   "keywords": [
     "apple",
@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@gcu/iso9660": "^0.1.0",
-    "@inputforge/sandboxctl-providers": "0.1.0",
+    "@inputforge/sandboxctl-providers": "0.2.0",
     "env-paths": "^4.0.0"
   },
   "devDependencies": {

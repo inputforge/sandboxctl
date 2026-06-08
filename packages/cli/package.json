@@ -1,6 +1,6 @@
 {
   "name": "sandboxctl",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Create and manage Linux sandbox VMs for development",
   "keywords": [
     "development",
@@ -34,7 +34,7 @@
   "dependencies": {
     "@bomb.sh/args": "^0.3.1",
     "@clack/prompts": "^1.4.0",
-    "@inputforge/sandboxctl-providers": "0.1.0",
+    "@inputforge/sandboxctl-providers": "0.2.0",
     "env-paths": "^4.0.0",
     "zod": "^4.4.3"
   },
@@ -42,9 +42,9 @@
     "@types/node": "^22.0.0"
   },
   "optionalDependencies": {
-    "@inputforge/sandboxctl-ec2": "0.1.0",
-    "@inputforge/sandboxctl-qemu": "0.1.0",
-    "@inputforge/sandboxctl-vmm": "0.1.0"
+    "@inputforge/sandboxctl-ec2": "0.2.0",
+    "@inputforge/sandboxctl-qemu": "0.2.0",
+    "@inputforge/sandboxctl-vmm": "0.2.0"
   },
   "engines": {
     "node": ">=18.0.0"
