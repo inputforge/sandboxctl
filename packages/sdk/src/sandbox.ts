@@ -28,8 +28,8 @@ interface SandboxOptions {
   config: SandboxConfig;
   /**
    * Host key verifier. Return true to accept the key, false to reject.
-   * When omitted, all host keys are accepted (equivalent to StrictHostKeyChecking=no).
-   * Use the `createHostVerifier` helper from the CLI or implement your own TOFU/strict logic.
+   * When omitted, in-memory TOFU is used: the first key seen is trusted for
+   * the lifetime of this instance; mismatches on reconnect are rejected.
    */
   hostVerifier?: (key: Buffer) => boolean;
   identity?: SandboxIdentity;
@@ -65,6 +65,7 @@ export class Sandbox extends EventEmitter<SandboxEvents> {
   private readonly _provider: VmProvider;
   private readonly _identity: SandboxIdentity;
   private readonly _hostVerifier: (key: Buffer) => boolean;
+  private _trustedHostKey: Buffer | null = null;
   private _handle: SandboxHandle | null = null;
   private _sshClient: Client | null = null;
   private _sftpClient: SFTPWrapper | null = null;
@@ -82,7 +83,15 @@ export class Sandbox extends EventEmitter<SandboxEvents> {
     this.config = config;
     this._provider = provider;
     this._identity = identity ?? defaultIdentity();
-    this._hostVerifier = hostVerifier ?? (() => true);
+    this._hostVerifier =
+      hostVerifier ??
+      ((key: Buffer) => {
+        if (!this._trustedHostKey) {
+          this._trustedHostKey = key;
+          return true;
+        }
+        return this._trustedHostKey.equals(key);
+      });
   }
 
   async start(): Promise<void> {
