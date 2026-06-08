@@ -17,7 +17,7 @@
   "author": "Input Forge <contact@inputforge.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/inputforge/sandboxctl",
+    "url": "git+https://github.com/inputforge/sandboxctl.git",
     "directory": "packages/cli"
   },
   "bin": {
@@ -35,7 +35,6 @@
     "@bomb.sh/args": "^0.3.1",
     "@clack/prompts": "^1.4.0",
     "@inputforge/sandboxctl-providers": "0.1.0",
-    "@types/node": "^22.0.0",
     "env-paths": "^4.0.0",
     "zod": "^4.4.3"
   },
