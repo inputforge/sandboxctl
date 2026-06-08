@@ -9,22 +9,6 @@ permissions:
   contents: read
 
 jobs:
-  lint:
-    name: Lint & Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-        env:
-          npm_config_force: "true"
-      - run: npm run check
-
   lint-workflows:
     name: Lint Workflows
     runs-on: ubuntu-latest
@@ -90,6 +74,10 @@ jobs:
           # Ad-hoc signing for PRs; real identity injected on main via keychain setup above
           SIGN_IDENTITY: ${{ github.ref == 'refs/heads/main' && secrets.APPLE_SIGN_IDENTITY || '-' }}
         run: npm run build --workspaces --if-present
+
+      - name: Lint & Format
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run check
 
       - name: Cleanup keychain
         if: matrix.os == 'macos-latest' && github.ref == 'refs/heads/main' && always()

@@ -1,6 +1,13 @@
 import { execFile, execFileSync } from "node:child_process";
 import { once } from "node:events";
-import { createWriteStream, existsSync, mkdirSync, rmSync } from "node:fs";
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -12,11 +19,13 @@ import type {
   ProviderReporter,
   VmProvider,
 } from "@inputforge/sandboxctl-providers";
+import { z } from "zod";
 
 import { buildInstallScript } from "./installers.js";
 import {
   appDataDir,
   imagesDir,
+  qemuStatePath,
   sandboxDir,
   seedImgPath,
   vmImgPath,
@@ -63,6 +72,11 @@ runcmd:
 `;
 }
 
+const QemuStateSchema = z.object({
+  port: z.number().int().positive(),
+  version: z.number().int().positive().default(1),
+});
+
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
 function formatProgress(downloaded: number, total: number): string {
@@ -75,17 +89,19 @@ async function downloadFile(
   label: string,
   reporter: ProviderReporter
 ): Promise<void> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} downloading ${url}`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} downloading ${url}`);
+  }
+  if (response.body === null) {
+    throw new Error(`Response body is null for ${url}`);
   }
 
-  const total = Number(res.headers.get("content-length") ?? 0);
+  const total = Number(response.headers.get("content-length") ?? 0);
   const bar = reporter.progress(label, total > 0 ? total : undefined);
-
   let downloaded = 0;
 
-  async function* trackProgress(source: AsyncIterable<Buffer>) {
+  async function* trackProgress(source: AsyncIterable<Uint8Array>) {
     for await (const chunk of source) {
       downloaded += chunk.length;
       bar.advance(chunk.length, formatProgress(downloaded, total));
@@ -95,11 +111,7 @@ async function downloadFile(
 
   try {
     const file = createWriteStream(destPath);
-    await pipeline(
-      Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
-      trackProgress,
-      file
-    );
+    await pipeline(Readable.fromWeb(response.body), trackProgress, file);
     bar.stop("Base image downloaded.");
   } catch (error) {
     bar.stop("Download failed.");
@@ -179,7 +191,7 @@ async function streamInstallLog(
   child.stderr?.resume();
 
   for await (const chunk of child.stdout ?? []) {
-    for (const line of (chunk as Buffer).toString().split("\n")) {
+    for (const line of String(chunk).split("\n")) {
       if (!line.trim()) {
         continue;
       }
@@ -223,7 +235,9 @@ async function boot(
 
   if (isFirstBoot) {
     reporter.step("Streaming install log:");
-    await streamInstallLog(port, config.username, (line) => reporter.log(line));
+    await streamInstallLog(port, config.username, (line) => {
+      reporter.log(line);
+    });
   }
 }
 
@@ -314,12 +328,13 @@ async function subsequentBoot(
   const running = await isVmRunning(vmSockPath(name));
 
   if (running) {
-    const diskChanged = snapshot && config.vm.disk !== snapshot.vm.disk;
+    const diskChanged =
+      snapshot !== null && config.vm.disk !== snapshot.vm.disk;
     const vmChanged =
-      snapshot &&
+      snapshot !== null &&
       (config.vm.cpus !== snapshot.vm.cpus ||
         config.vm.memory !== snapshot.vm.memory);
-    if (!(snapshot && (diskChanged || vmChanged))) {
+    if (!(diskChanged || vmChanged)) {
       throw new Error(`Sandbox "${name}" is already running.`);
     }
     reporter.step("Config changed — stopping VM to apply changes...");
@@ -386,7 +401,7 @@ export function createQemuProvider(pc: PlatformConfig): VmProvider {
 
     isInitialized: (name) => existsSync(vmImgPath(name)),
 
-    isRunning: (name) => isVmRunning(vmSockPath(name)),
+    isRunning: async (name) => await isVmRunning(vmSockPath(name)),
 
     isSupported(): boolean {
       return true;
@@ -408,10 +423,30 @@ export function createQemuProvider(pc: PlatformConfig): VmProvider {
       ];
     },
 
+    resolve: async (name) => {
+      if (!existsSync(qemuStatePath(name))) {
+        return null;
+      }
+      const running = await isVmRunning(vmSockPath(name));
+      if (!running) {
+        return null;
+      }
+      const state = QemuStateSchema.parse(
+        JSON.parse(readFileSync(qemuStatePath(name), "utf-8"))
+      );
+      return { host: "127.0.0.1", port: state.port };
+    },
+
     start: async (config, name, snapshot, reporter) => {
       const port = existsSync(vmImgPath(name))
         ? await subsequentBoot(pc, config, name, snapshot, reporter)
         : await firstBoot(pc, config, name, reporter);
+      mkdirSync(sandboxDir(name), { recursive: true });
+      writeFileSync(
+        qemuStatePath(name),
+        JSON.stringify({ port, version: 1 }),
+        "utf-8"
+      );
       return { host: "127.0.0.1", port };
     },
 

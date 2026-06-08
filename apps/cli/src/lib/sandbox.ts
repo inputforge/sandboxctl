@@ -41,6 +41,11 @@ const VmmHostConfigSchema = z.object({
 
 const SandboxConfigSchema = z.object({
   ec2: Ec2ConfigSchema.optional(),
+  hostVerification: z
+    .object({
+      mode: z.enum(["skip", "tofu", "strict"]).optional(),
+    })
+    .optional(),
   packages: z.record(z.string(), PackageConfigSchema),
   ports: z.array(PortForwardSchema).optional(),
   provider: z.enum(["local", "ec2", "vmm"]).optional(),

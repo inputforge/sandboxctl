@@ -1,7 +1,7 @@
-export interface VmStartResult {
+export interface SandboxHandle {
   host: string;
-  identityFile?: string;
   port: number;
+  [key: string]: unknown;
 }
 
 export interface SpinnerHandle {
@@ -39,16 +39,21 @@ export interface VmProvider {
   /**
    * Start the VM (first or subsequent boot). Handles all provider-specific
    * setup, boot sequencing, and waiting until SSH + provisioning are ready.
-   * Returns the SSH endpoint.
+   * Returns a SandboxHandle with host/port and any provider-specific fields.
    */
   start(
     config: SandboxConfig,
     name: string,
     snapshot: SandboxConfig | null,
     reporter: ProviderReporter
-  ): Promise<VmStartResult>;
+  ): Promise<SandboxHandle>;
   stop(name: string, reporter: ProviderReporter): Promise<void>;
   destroy(name: string, reporter: ProviderReporter): Promise<void>;
+  /**
+   * Resolve an existing (possibly running) sandbox by name.
+   * Returns null if the sandbox is not running or cannot be resolved.
+   */
+  resolve(name: string): Promise<SandboxHandle | null>;
 }
 
 export interface PackageConfig {
@@ -73,9 +78,14 @@ export interface VmmHostConfig {
   boot?: "efi" | "linux";
 }
 
+export interface HostVerificationConfig {
+  mode?: "skip" | "tofu" | "strict";
+}
+
 export interface SandboxConfig {
   ec2?: Ec2Config;
   vmm?: VmmHostConfig;
+  hostVerification?: HostVerificationConfig;
   packages: Record<string, PackageConfig>;
   ports?: PortForward[];
   provider?: "local" | "ec2" | "vmm";

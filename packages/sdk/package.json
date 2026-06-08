@@ -1,10 +1,8 @@
 {
-  "name": "sandboxctl",
+  "name": "@inputforge/sandbox",
   "version": "0.2.0",
-  "description": "Create and manage Linux sandbox VMs for development",
+  "description": "Programmatic SDK for creating and managing sandboxctl VMs",
   "keywords": [
-    "development",
-    "linux",
     "sandbox",
     "virtualization",
     "vm"
@@ -18,28 +16,35 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/inputforge/sandboxctl.git",
-    "directory": "packages/cli"
-  },
-  "bin": {
-    "sandboxctl": "./dist/index.js"
+    "directory": "packages/sdk"
   },
   "files": [
     "dist"
   ],
   "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "tsc"
   },
   "dependencies": {
-    "@bomb.sh/args": "^0.3.1",
-    "@clack/prompts": "^1.4.0",
     "@inputforge/sandboxctl-providers": "0.2.0",
     "env-paths": "^4.0.0",
+    "ssh2": "^1.16.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@types/ssh2": "^1.15.0",
+    "typescript": "^6.0.0"
   },
   "optionalDependencies": {
     "@inputforge/sandboxctl-ec2": "0.2.0",

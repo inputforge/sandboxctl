@@ -59,7 +59,7 @@ async function collectPackageVersions(
       if (isCancel(ver)) {
         return null;
       }
-      packages[pkg] = { enabled: true, version: ver as string };
+      packages[pkg] = { enabled: true, version: ver };
     } else {
       packages[pkg] = { enabled: true };
     }
@@ -106,8 +106,8 @@ async function collectVmResources(
 
   return {
     cpus: Number(cpusRaw),
-    disk: disk as string,
-    memory: memory as string,
+    disk,
+    memory,
   };
 }
 
@@ -158,11 +158,11 @@ async function collectEc2Config(
     return null;
   }
 
-  const trimmedInstanceType = (instanceType as string).trim();
+  const trimmedInstanceType = instanceType.trim();
   return {
     arch,
-    region: (region as string).trim(),
-    sshCidr: (sshCidr as string).trim(),
+    region: region.trim(),
+    sshCidr: sshCidr.trim(),
     ...(trimmedInstanceType ? { instanceType: trimmedInstanceType } : {}),
   };
 }
@@ -221,7 +221,7 @@ async function collectPackages(
   if (isCancel(selectedRaw)) {
     return null;
   }
-  const selectedPackages = selectedRaw as string[];
+  const selectedPackages = selectedRaw;
 
   const packages = await collectPackageVersions(selectedPackages, existing);
   if (!packages) {
@@ -284,8 +284,8 @@ export async function runInitPrompts(
       : {}),
     packages,
     provider: providerConfig.provider,
-    send: { remotePath: remotePath as string },
-    ubuntu: ubuntu as string,
+    send: { remotePath },
+    ubuntu,
     username: defaultUsername,
     vm,
   };

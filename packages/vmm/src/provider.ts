@@ -1,23 +1,17 @@
 import { execFile, execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFile, rm, stat } from "node:fs/promises";
 import { arch as hostArch } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { promisify } from "node:util";
 
 import type {
   PrereqResult,
   ProviderReporter,
   SandboxConfig,
+  SandboxHandle,
   VmProvider,
-  VmStartResult,
 } from "@inputforge/sandboxctl-providers";
 
 import {
@@ -52,8 +46,6 @@ import { buildEfiVmmConfig, buildLinuxVmmConfig } from "./vmm-config.js";
 
 const VMM_MIN_MACOS = 13;
 
-const execFileAsync = promisify(execFile);
-
 function macOsMajorVersion(): number {
   try {
     const raw = execFileSync("sw_vers", ["-productVersion"], {
@@ -73,16 +65,18 @@ function normalizeMac(mac: string): string {
     .join(":");
 }
 
-async function lookupArp(mac: string): Promise<string | null> {
+function lookupArp(mac: string): string | null {
   const normalizedTarget = normalizeMac(mac);
   try {
-    const { stdout } = await execFileAsync("arp", ["-an"], {
-      encoding: "utf-8",
-    });
+    const stdout = execFileSync("arp", ["-an"], { encoding: "utf-8" });
     for (const line of stdout.split("\n")) {
-      const match = line.match(ARP_LINE_RE);
+      const match = ARP_LINE_RE.exec(line);
       const parsedMac = match?.[2];
-      if (parsedMac && normalizeMac(parsedMac) === normalizedTarget) {
+      if (
+        parsedMac !== undefined &&
+        match !== null &&
+        normalizeMac(parsedMac) === normalizedTarget
+      ) {
         return match[1] ?? null;
       }
     }
@@ -108,8 +102,8 @@ async function pollVmIp(macPath: string, maxAttempts = 60): Promise<string> {
   for (let i = 0; i < maxAttempts; i += 1) {
     if (existsSync(macPath)) {
       const mac = readFileSync(macPath, "utf-8").trim().toLowerCase();
-      const ip = await lookupArp(mac);
-      if (ip) {
+      const ip = lookupArp(mac);
+      if (ip !== null) {
         return ip;
       }
     }
@@ -126,20 +120,24 @@ async function pollSsh(
 ): Promise<void> {
   for (let i = 1; i <= maxAttempts; i += 1) {
     try {
-      await execFileAsync("ssh", [
-        "-o",
-        "ConnectTimeout=3",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-o",
-        "BatchMode=yes",
-        "-i",
-        identityFile,
-        `${username}@${host}`,
-        "exit",
-      ]);
+      execFileSync(
+        "ssh",
+        [
+          "-o",
+          "ConnectTimeout=3",
+          "-o",
+          "StrictHostKeyChecking=no",
+          "-o",
+          "UserKnownHostsFile=/dev/null",
+          "-o",
+          "BatchMode=yes",
+          "-i",
+          identityFile,
+          `${username}@${host}`,
+          "exit",
+        ],
+        { stdio: "ignore" }
+      );
       return;
     } catch {
       await sleep(3000);
@@ -172,7 +170,7 @@ async function streamInstallLog(
   child.stderr?.resume();
 
   for await (const chunk of child.stdout ?? []) {
-    for (const line of (chunk as Buffer).toString().split("\n")) {
+    for (const line of String(chunk).split("\n")) {
       if (!line.trim()) {
         continue;
       }
@@ -241,7 +239,7 @@ async function boot(
   identityFile: string,
   isFirstBoot: boolean,
   reporter: ProviderReporter
-): Promise<VmStartResult> {
+): Promise<SandboxHandle> {
   const macPath = linux
     ? vmmMacPath(name)
     : join(vmmStateDirPath(name), "macaddr");
@@ -267,12 +265,12 @@ async function boot(
 
   if (isFirstBoot) {
     reporter.step("Streaming install log:");
-    await streamInstallLog(host, identityFile, config.username, (line) =>
-      reporter.log(line)
-    );
+    await streamInstallLog(host, identityFile, config.username, (line) => {
+      reporter.log(line);
+    });
   }
 
-  return { host, identityFile, port: 22 };
+  return { host, port: 22 };
 }
 
 async function firstBoot(
@@ -280,7 +278,7 @@ async function firstBoot(
   config: SandboxConfig,
   name: string,
   reporter: ProviderReporter
-): Promise<VmStartResult> {
+): Promise<SandboxHandle> {
   mkdirSync(sandboxDir(name), { recursive: true });
   mkdirSync(appDataDir, { recursive: true });
   mkdirSync(imagesDir, { recursive: true });
@@ -354,16 +352,24 @@ async function firstBoot(
   );
   seedSpinner.stop("Seed image created.");
 
-  return boot(vmmBin, config, name, linuxArgs, privateKeyPath, true, reporter);
+  return await boot(
+    vmmBin,
+    config,
+    name,
+    linuxArgs,
+    privateKeyPath,
+    true,
+    reporter
+  );
 }
 
-function subsequentBoot(
+async function subsequentBoot(
   vmmBin: string,
   config: SandboxConfig,
   name: string,
   snapshot: SandboxConfig | null,
   reporter: ProviderReporter
-): Promise<VmStartResult> {
+): Promise<SandboxHandle> {
   checkRebuildGuards(config, snapshot);
 
   if (isVmmRunning(vmmPidPath(name))) {
@@ -385,29 +391,44 @@ function subsequentBoot(
       mac,
     };
   }
-  return boot(vmmBin, config, name, linuxArgs, privateKeyPath, false, reporter);
+  return await boot(
+    vmmBin,
+    config,
+    name,
+    linuxArgs,
+    privateKeyPath,
+    false,
+    reporter
+  );
 }
 
 export function createVmmProvider(): VmProvider {
   return {
     checkPrereqs(): void {
-      const [result] = this.reportPrereqs();
-      if (result && !result.ok) {
-        throw new Error(result.installCmd);
+      for (const result of this.reportPrereqs()) {
+        if (!result.ok) {
+          throw new Error(result.installCmd);
+        }
       }
     },
 
-    destroy: (name, _reporter) => {
+    destroy: async (name, _reporter) => {
       if (isVmmRunning(vmmPidPath(name))) {
         throw new Error("Sandbox is running. Stop it first: sandboxctl stop");
       }
-      rmSync(sandboxDir(name), { force: true, recursive: true });
-      return Promise.resolve();
+      await rm(sandboxDir(name), { force: true, recursive: true });
     },
 
     isInitialized: (name) => existsSync(vmRawDiskPath(name)),
 
-    isRunning: (name) => Promise.resolve(isVmmRunning(vmmPidPath(name))),
+    isRunning: async (name) => {
+      try {
+        await stat(vmmPidPath(name));
+      } catch {
+        return false;
+      }
+      return isVmmRunning(vmmPidPath(name));
+    },
 
     isSupported(): boolean {
       return process.platform === "darwin";
@@ -424,13 +445,33 @@ export function createVmmProvider(): VmProvider {
       ];
     },
 
-    start: (config, name, snapshot, reporter) => {
-      const vmmBin = resolveVmmBinary();
-      return existsSync(vmRawDiskPath(name))
-        ? subsequentBoot(vmmBin, config, name, snapshot, reporter)
-        : firstBoot(vmmBin, config, name, reporter);
+    resolve: async (name) => {
+      if (!isVmmRunning(vmmPidPath(name))) {
+        return null;
+      }
+      const macPath = existsSync(vmmMacPath(name))
+        ? vmmMacPath(name)
+        : join(vmmStateDirPath(name), "macaddr");
+      if (!existsSync(macPath)) {
+        return null;
+      }
+      const mac = await readFile(macPath, "utf-8");
+      const host = lookupArp(mac.trim());
+      if (host === null) {
+        return null;
+      }
+      return { host, port: 22 };
     },
 
-    stop: (name, _reporter) => stopVmm(vmmPidPath(name)),
+    start: async (config, name, snapshot, reporter) => {
+      const vmmBin = resolveVmmBinary();
+      return existsSync(vmRawDiskPath(name))
+        ? await subsequentBoot(vmmBin, config, name, snapshot, reporter)
+        : await firstBoot(vmmBin, config, name, reporter);
+    },
+
+    stop: async (name, _reporter) => {
+      await stopVmm(vmmPidPath(name));
+    },
   };
 }

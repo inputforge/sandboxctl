@@ -1,7 +1,6 @@
 import type {
   SandboxConfig,
   VmProvider,
-  VmStartResult,
 } from "@inputforge/sandboxctl-providers";
 
 import type { GlobalConfig } from "../global-config.js";
@@ -22,7 +21,7 @@ interface PlatformHint {
 }
 
 function parseMemoryMiB(memory: string): number {
-  const match = memory.trim().match(/^(\d+)\s*(M|MB|MIB|G|GB|GIB)$/iu);
+  const match = /^(\d+)\s*(M|MB|MIB|G|GB|GIB)$/iu.exec(memory.trim());
   if (!match) {
     throw new Error(
       `Unsupported memory format "${memory}". Use values like "1024M" or "1G".`
@@ -143,4 +142,4 @@ export async function getPlatformProvider(
   return createQemuProvider(getPlatformConfig());
 }
 
-export type { VmProvider, VmStartResult };
+export type { VmProvider };

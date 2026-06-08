@@ -114,9 +114,6 @@ export function buildInstallScript(
       continue;
     }
     const builder = installers[name];
-    if (!builder) {
-      continue;
-    }
     lines.push(...builder(cfg, ubuntuArch), "");
   }
 

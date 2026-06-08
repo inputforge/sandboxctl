@@ -12,6 +12,7 @@ import {
   writeState,
 } from "../lib/sandbox.js";
 import { buildSshTransport } from "../lib/ssh-command.js";
+import { findSshKeyPair } from "../lib/ssh-key.js";
 import { send } from "./send.js";
 
 export async function start(): Promise<void> {
@@ -25,15 +26,20 @@ export async function start(): Promise<void> {
   }
   const snapshot = readConfigSnapshot();
 
+  let identityFile: string;
+  try {
+    ({ privateKeyPath: identityFile } = findSshKeyPair());
+  } catch (error) {
+    throw new Error(
+      `Failed to locate SSH key pair (generation or read error): ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  }
+
   intro(`sandboxctl — starting "${name}"`);
 
   const reporter = createReporter();
-  const { host, identityFile, port } = await provider.start(
-    config,
-    name,
-    snapshot,
-    reporter
-  );
+  const { host, port } = await provider.start(config, name, snapshot, reporter);
 
   writeState({ host, identityFile, port, startedAt: new Date().toISOString() });
   writeConfigSnapshot(config);

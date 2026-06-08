@@ -1,10 +1,10 @@
 {
-  "name": "@inputforge/sandboxctl-vmm",
+  "name": "sandboxctl",
   "version": "0.2.0",
-  "description": "sandboxctl VM provider backed by the vmm Swift binary",
+  "description": "Create and manage Linux sandbox VMs for development",
   "keywords": [
-    "apple",
-    "macos",
+    "development",
+    "linux",
     "sandbox",
     "virtualization",
     "vm"
@@ -18,36 +18,33 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/inputforge/sandboxctl.git",
-    "directory": "packages/vmm"
+    "directory": "apps/cli"
+  },
+  "bin": {
+    "sandboxctl": "./dist/index.js"
   },
   "files": [
     "dist"
   ],
-  "os": [
-    "darwin"
-  ],
   "type": "module",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
-    "build": "tsc && if [ \"$(uname)\" = \"Darwin\" ]; then make -C src-native sign && cp src-native/.build/apple/Products/Release/vmm dist/vmm; fi"
+    "build": "tsc"
   },
   "dependencies": {
-    "@gcu/iso9660": "^0.1.0",
+    "@bomb.sh/args": "^0.3.1",
+    "@clack/prompts": "^1.4.0",
     "@inputforge/sandboxctl-providers": "0.2.0",
-    "env-paths": "^4.0.0"
+    "env-paths": "^4.0.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^6.0.0"
+  },
+  "optionalDependencies": {
+    "@inputforge/sandboxctl-ec2": "0.2.0",
+    "@inputforge/sandboxctl-qemu": "0.2.0",
+    "@inputforge/sandboxctl-vmm": "0.2.0"
   },
   "engines": {
     "node": ">=18.0.0"

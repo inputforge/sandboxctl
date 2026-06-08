@@ -150,8 +150,8 @@ sandboxctl receive   # VM → host
 
 ```sh
 npm install
-npm run build     # tsc
-npm run dev       # tsc --watch
+npm run build     # compile all packages (required before npm run cli)
+npm run cli       # run the compiled CLI
 ```
 
 ## License

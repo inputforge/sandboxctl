@@ -29,3 +29,7 @@ export function vmSockPath(name: string): string {
 export function vmLogPath(name: string): string {
   return join(sandboxDir(name), "vm.log");
 }
+
+export function qemuStatePath(name: string): string {
+  return join(sandboxDir(name), "qemu-state.json");
+}
