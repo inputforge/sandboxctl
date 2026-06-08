@@ -363,6 +363,9 @@ export async function streamInstallLog(
   child.stdout.on("data", (data: string) => {
     for (const line of data.split("\n")) {
       logLine(line);
+      if (line.includes("==> Done.")) {
+        child.kill("SIGTERM");
+      }
     }
   });
 

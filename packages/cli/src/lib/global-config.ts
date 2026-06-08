@@ -28,7 +28,12 @@ export function readGlobalConfig(): GlobalConfig {
     return GlobalConfigSchema.parse(
       JSON.parse(readFileSync(globalConfigPath, "utf-8"))
     );
-  } catch {
+  } catch (error) {
+    console.warn(
+      `Failed to read/parse config at ${globalConfigPath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
     return GlobalConfigSchema.parse({});
   }
 }

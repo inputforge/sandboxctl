@@ -3,8 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface SandboxIdentity {
-  privateKey?: string;
-  privateKeyPath?: string;
+  readonly privateKey?: string;
+  readonly privateKeyPath?: string;
 }
 
 const SSH_CANDIDATES = [

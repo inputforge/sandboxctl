@@ -18,14 +18,20 @@ import { SandboxFs } from "./sandbox-fs.js";
 import { SandboxProcess } from "./sandbox-process.js";
 
 export interface SandboxStatus {
-  handle?: SandboxHandle;
-  host?: string;
-  port?: number;
-  running: boolean;
+  readonly handle?: SandboxHandle;
+  readonly host?: string;
+  readonly port?: number;
+  readonly running: boolean;
 }
 
 interface SandboxOptions {
   config: SandboxConfig;
+  /**
+   * Host key verifier. Return true to accept the key, false to reject.
+   * When omitted, all host keys are accepted (equivalent to StrictHostKeyChecking=no).
+   * Use the `createHostVerifier` helper from the CLI or implement your own TOFU/strict logic.
+   */
+  hostVerifier?: (key: Buffer) => boolean;
   identity?: SandboxIdentity;
   name: string;
   provider: VmProvider;
@@ -58,17 +64,25 @@ export class Sandbox extends EventEmitter<SandboxEvents> {
 
   private readonly _provider: VmProvider;
   private readonly _identity: SandboxIdentity;
+  private readonly _hostVerifier: (key: Buffer) => boolean;
   private _handle: SandboxHandle | null = null;
   private _sshClient: Client | null = null;
   private _sftpClient: SFTPWrapper | null = null;
   private _fs: SandboxFs | null = null;
 
-  constructor({ config, identity, name, provider }: SandboxOptions) {
+  constructor({
+    config,
+    hostVerifier,
+    identity,
+    name,
+    provider,
+  }: SandboxOptions) {
     super();
     this.name = name;
     this.config = config;
     this._provider = provider;
     this._identity = identity ?? defaultIdentity();
+    this._hostVerifier = hostVerifier ?? (() => true);
   }
 
   async start(): Promise<void> {
@@ -175,8 +189,7 @@ export class Sandbox extends EventEmitter<SandboxEvents> {
     const client = new Client();
     client.connect({
       host: handle.host,
-      // Sandboxes use ephemeral keys; skip host verification
-      hostVerifier: () => true,
+      hostVerifier: this._hostVerifier,
       port: handle.port,
       privateKey,
       username: this.config.username,

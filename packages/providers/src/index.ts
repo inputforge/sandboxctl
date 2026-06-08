@@ -78,9 +78,14 @@ export interface VmmHostConfig {
   boot?: "efi" | "linux";
 }
 
+export interface HostVerificationConfig {
+  mode?: "skip" | "tofu" | "strict";
+}
+
 export interface SandboxConfig {
   ec2?: Ec2Config;
   vmm?: VmmHostConfig;
+  hostVerification?: HostVerificationConfig;
   packages: Record<string, PackageConfig>;
   ports?: PortForward[];
   provider?: "local" | "ec2" | "vmm";
