@@ -1,8 +1,12 @@
-import { once } from "node:events";
 import type { Readable, Writable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
 
 import type { SFTPWrapper, Stats } from "ssh2";
+
+async function* bufferToStream(buf: Buffer) {
+  yield buf;
+}
 
 export class SandboxFs {
   private readonly _getSftp: () => Promise<SFTPWrapper>;
@@ -25,12 +29,7 @@ export class SandboxFs {
   async write(path: string, data: Buffer | Readable): Promise<void> {
     const sftp = await this._getSftp();
     const stream = sftp.createWriteStream(path);
-    if (Buffer.isBuffer(data)) {
-      stream.end(data);
-    } else {
-      data.pipe(stream);
-    }
-    await once(stream, "finish");
+    await pipeline(Buffer.isBuffer(data) ? bufferToStream(data) : data, stream);
   }
 
   async readdir(path: string): Promise<string[]> {

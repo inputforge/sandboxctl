@@ -128,9 +128,9 @@ export async function spawnToFile(
   const out = createWriteStream(destPath);
   const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "ignore"] });
 
-  await new Promise<void>((resolve, reject) => {
-    child.on("error", (err) => {
-      reject(new Error(`${cmd} process error`, { cause: err }));
+  const exitPromise = new Promise<void>((resolve, reject) => {
+    child.on("error", (error) => {
+      reject(new Error(`${cmd} process error`, { cause: error }));
     });
     child.on("close", (code) => {
       if (code !== 0 && !allowedExitCodes.includes(code ?? -1)) {
@@ -139,9 +139,23 @@ export async function spawnToFile(
         resolve();
       }
     });
-  }).finally(() => {
-    out.close();
   });
+
+  child.stdout?.pipe(out);
+
+  const finishPromise = new Promise<void>((resolve, reject) => {
+    out.on("finish", resolve);
+    out.on("error", (error) => {
+      reject(new Error(`write error for ${destPath}`, { cause: error }));
+    });
+  });
+
+  try {
+    await Promise.all([exitPromise, finishPromise]);
+  } catch (error) {
+    out.destroy();
+    throw error;
+  }
 }
 
 async function extractKernel(

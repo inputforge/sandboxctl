@@ -44,10 +44,17 @@ export class SandboxProcess extends EventEmitter<SandboxProcessEvents> {
           this.emit("error", error);
         });
       } catch (error) {
-        this.emit(
-          "error",
-          error instanceof Error ? error : new Error(String(error))
-        );
+        stdout.end();
+        stderr.end();
+        this.exitCode = 1;
+        this.emit("exit", 1);
+        // Defer to avoid unhandled exception when no listener is attached yet
+        process.nextTick(() => {
+          this.emit(
+            "error",
+            error instanceof Error ? error : new Error(String(error))
+          );
+        });
       }
     })();
   }

@@ -91,7 +91,13 @@ export class Sandbox extends EventEmitter<SandboxEvents> {
     }
     const running = await this._provider.isRunning(this.name);
     if (running) {
-      this._handle = await this._provider.resolve(this.name);
+      const handle = await this._provider.resolve(this.name);
+      if (!handle) {
+        throw new Error(
+          `Sandbox "${this.name}" is running but its state could not be resolved (state file missing or corrupt).`
+        );
+      }
+      this._handle = handle;
       return;
     }
     const reporter = this._createReporter();

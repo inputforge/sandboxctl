@@ -30,7 +30,15 @@ export async function start(): Promise<void> {
 
   const reporter = createReporter();
   const { host, port } = await provider.start(config, name, snapshot, reporter);
-  const { privateKeyPath: identityFile } = findSshKeyPair();
+  let identityFile: string;
+  try {
+    ({ privateKeyPath: identityFile } = findSshKeyPair());
+  } catch (error) {
+    throw new Error(
+      `Failed to locate SSH key pair (generation or read error): ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  }
 
   writeState({ host, identityFile, port, startedAt: new Date().toISOString() });
   writeConfigSnapshot(config);
