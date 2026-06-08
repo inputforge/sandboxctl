@@ -12,15 +12,26 @@ export function knownHostsPath(): string {
 /**
  * Parse the key-type string from an OpenSSH wire-format key buffer.
  * Wire format: 4-byte big-endian length + key-type string + ...
+ * Returns false if the buffer is too short or otherwise malformed.
  */
-function keyType(key: Buffer): string {
+function keyType(key: Buffer): string | false {
+  if (key.length < 4) {
+    return false;
+  }
   const len = key.readUInt32BE(0);
+  if (key.length < 4 + len) {
+    return false;
+  }
   return key.subarray(4, 4 + len).toString("utf-8");
 }
 
 /** Encode a wire-format key as "<key-type> <base64>" — the known_hosts token pair. */
-function encodeKey(key: Buffer): string {
-  return `${keyType(key)} ${key.toString("base64")}`;
+function encodeKey(key: Buffer): string | false {
+  const type = keyType(key);
+  if (type === false) {
+    return false;
+  }
+  return `${type} ${key.toString("base64")}`;
 }
 
 /**
@@ -37,10 +48,14 @@ function loadKnownHosts(path: string): Map<string, string> {
     if (!line || line.startsWith("#") || line.startsWith("@")) {
       continue;
     }
-    const spaceIdx = line.indexOf(" ");
-    const rest = line.slice(spaceIdx + 1);
+    const spaceIdx = line.search(/\s/u);
+    if (spaceIdx === -1) {
+      continue;
+    }
+    const host = line.slice(0, spaceIdx);
+    const rest = line.slice(spaceIdx).trimStart();
     // rest = "<keytype> <base64>" — keep the two-token key entry
-    entries.set(line.slice(0, spaceIdx), rest);
+    entries.set(host, rest);
   }
   return entries;
 }
@@ -82,6 +97,12 @@ export function createHostVerifier(
 
   return (key: Buffer): boolean => {
     const incoming = encodeKey(key);
+    if (incoming === false) {
+      console.error(
+        `[sandboxctl] Received malformed host key for "${sandboxName}" — rejecting`
+      );
+      return false;
+    }
     const entries = loadKnownHosts(storePath);
     const stored = entries.get(sandboxName);
 

@@ -26,10 +26,6 @@ export async function start(): Promise<void> {
   }
   const snapshot = readConfigSnapshot();
 
-  intro(`sandboxctl — starting "${name}"`);
-
-  const reporter = createReporter();
-  const { host, port } = await provider.start(config, name, snapshot, reporter);
   let identityFile: string;
   try {
     ({ privateKeyPath: identityFile } = findSshKeyPair());
@@ -39,6 +35,11 @@ export async function start(): Promise<void> {
       { cause: error }
     );
   }
+
+  intro(`sandboxctl — starting "${name}"`);
+
+  const reporter = createReporter();
+  const { host, port } = await provider.start(config, name, snapshot, reporter);
 
   writeState({ host, identityFile, port, startedAt: new Date().toISOString() });
   writeConfigSnapshot(config);

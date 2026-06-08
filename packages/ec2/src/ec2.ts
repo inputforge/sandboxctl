@@ -1,5 +1,4 @@
 import { execFileSync, spawn } from "node:child_process";
-import { once } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import {
@@ -359,15 +358,39 @@ export async function streamInstallLog(
     "until [ -f /var/log/install-tools.log ]; do sleep 2; done; tail -f /var/log/install-tools.log",
   ]);
 
-  child.stdout.setEncoding("utf-8");
-  child.stdout.on("data", (data: string) => {
-    for (const line of data.split("\n")) {
-      logLine(line);
-      if (line.includes("==> Done.")) {
-        child.kill("SIGTERM");
-      }
-    }
-  });
+  await new Promise<void>((resolve, reject) => {
+    let buffer = "";
+    let done = false;
 
-  await once(child, "close");
+    child.stdout.setEncoding("utf-8");
+    child.stdout.on("data", (data: string) => {
+      buffer += data;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        logLine(line);
+        if (!done && line.includes("==> Done.")) {
+          done = true;
+          child.kill("SIGTERM");
+        }
+      }
+    });
+
+    child.once("close", (code) => {
+      if (buffer) {
+        logLine(buffer);
+      }
+      if (done) {
+        resolve();
+      } else {
+        reject(
+          new Error(
+            `Install log stream ended without completion marker (exit code ${code ?? "signal"})`
+          )
+        );
+      }
+    });
+
+    child.once("error", reject);
+  });
 }
