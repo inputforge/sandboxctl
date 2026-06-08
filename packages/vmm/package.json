@@ -1,6 +1,6 @@
 {
   "name": "@inputforge/sandboxctl-vmm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "sandboxctl VM provider backed by the vmm Swift binary",
   "keywords": [
     "apple",
@@ -17,7 +17,7 @@
   "author": "Input Forge <contact@inputforge.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/inputforge/sandboxctl",
+    "url": "git+https://github.com/inputforge/sandboxctl.git",
     "directory": "packages/vmm"
   },
   "files": [
@@ -30,13 +30,16 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc && if [ \"$(uname)\" = \"Darwin\" ]; then make -C src-native sign && cp src-native/.build/apple/Products/Release/vmm dist/vmm; fi",
     "dev": "tsc --watch"
   },
   "dependencies": {
     "@gcu/iso9660": "^0.1.0",
-    "@inputforge/sandboxctl-providers": "0.1.0",
+    "@inputforge/sandboxctl-providers": "0.2.0",
     "env-paths": "^4.0.0"
   },
   "devDependencies": {

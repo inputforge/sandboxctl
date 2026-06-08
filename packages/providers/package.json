@@ -1,6 +1,6 @@
 {
   "name": "@inputforge/sandboxctl-providers",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shared provider types for sandboxctl VM providers",
   "keywords": [
     "provider",
@@ -16,7 +16,7 @@
   "author": "Input Forge <contact@inputforge.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/inputforge/sandboxctl",
+    "url": "git+https://github.com/inputforge/sandboxctl.git",
     "directory": "packages/providers"
   },
   "files": [
@@ -25,6 +25,9 @@
   "type": "module",
   "exports": {
     ".": "./dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc",
