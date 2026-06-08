@@ -37,9 +37,9 @@ Set `provider: "vmm"` in `sandbox.json` and optionally configure boot mode:
 }
 ```
 
-| Field | Default | Description |
-|---|---|---|
-| `boot` | `"efi"` | Boot mode: `"efi"` (standard) or `"linux"` (direct kernel boot) |
+| Field  | Default   | Description                                                     |
+| ------ | --------- | --------------------------------------------------------------- |
+| `boot` | `"linux"` | Boot mode: `"linux"` (direct kernel boot) or `"efi"` (standard) |
 
 ## How it works
 

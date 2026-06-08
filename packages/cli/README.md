@@ -26,19 +26,19 @@ sandboxctl ssh      # shell inside the VM
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `sandboxctl` | Interactive setup wizard |
-| `sandboxctl init` | Configure `sandbox.json` |
-| `sandboxctl start` | Build (if needed) and boot the VM |
-| `sandboxctl stop` | Gracefully shut down the VM |
-| `sandboxctl destroy` | Delete the VM and all associated files |
-| `sandboxctl status` | Show name, status, SSH port, and uptime |
-| `sandboxctl ssh` | Open an interactive SSH session |
-| `sandboxctl send` | Sync project files host → VM |
-| `sandboxctl receive` | Sync files VM → host |
+| Command                     | Description                                    |
+| --------------------------- | ---------------------------------------------- |
+| `sandboxctl`                | Interactive setup wizard                       |
+| `sandboxctl init`           | Configure `sandbox.json`                       |
+| `sandboxctl start`          | Build (if needed) and boot the VM              |
+| `sandboxctl stop`           | Gracefully shut down the VM                    |
+| `sandboxctl destroy`        | Delete the VM and all associated files         |
+| `sandboxctl status`         | Show name, status, SSH port, and uptime        |
+| `sandboxctl ssh`            | Open an interactive SSH session                |
+| `sandboxctl send`           | Sync project files host → VM                   |
+| `sandboxctl receive`        | Sync files VM → host                           |
 | `sandboxctl forward [port]` | Forward a port (`<guest>` or `<host>:<guest>`) |
-| `sandboxctl doctor` | Check required dependencies |
+| `sandboxctl doctor`         | Check required dependencies                    |
 
 ## Configuration — `sandbox.json`
 
@@ -63,26 +63,26 @@ sandboxctl ssh      # shell inside the VM
 
 ### Supported packages
 
-| Package | Versioned |
-|---|---|
-| Node.js | yes |
-| Bun | yes |
-| Python 3 | no |
-| Java (OpenJDK) | yes |
-| Go | yes |
-| Ruby | no |
-| PHP | no |
-| Swift | yes |
+| Package        | Versioned |
+| -------------- | --------- |
+| Node.js        | yes       |
+| Bun            | yes       |
+| Python 3       | no        |
+| Java (OpenJDK) | yes       |
+| Go             | yes       |
+| Ruby           | no        |
+| PHP            | no        |
+| Swift          | yes       |
 
 ## Providers
 
 sandboxctl supports multiple VM backends via the `provider` field in `sandbox.json`:
 
-| Provider | Description | Platform |
-|---|---|---|
-| `local` (default) | QEMU — works everywhere | macOS, Linux |
-| `vmm` | Apple Virtualization framework | macOS only |
-| `ec2` | AWS EC2 | any |
+| Provider          | Description                    | Platform     |
+| ----------------- | ------------------------------ | ------------ |
+| `local` (default) | QEMU — works everywhere        | macOS, Linux |
+| `vmm`             | Apple Virtualization framework | macOS only   |
+| `ec2`             | AWS EC2                        | any          |
 
 ## Agent Skill
 

@@ -28,12 +28,12 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 22.14.0
           package-manager-cache: false
           registry-url: https://registry.npmjs.org
 
-      - name: Upgrade npm (staged publishing requires npm ≥ 11.15.0, Node ≥ 22.14.0)
-        run: npm install -g npm@latest
+      - name: Upgrade npm (staged publishing requires npm ≥ 11.15.0)
+        run: npm install -g npm@11.15.0
 
       - run: npm ci
 
@@ -69,6 +69,7 @@ jobs:
 
       - name: Stage to npm
         run: |
+          shopt -s nullglob
           for tarball in ./*.tgz; do
             npm stage publish "$tarball" --access public --provenance
           done

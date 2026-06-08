@@ -27,12 +27,12 @@ Set `provider: "ec2"` in `sandbox.json` and optionally tune EC2-specific setting
 }
 ```
 
-| Field | Default | Description |
-|---|---|---|
-| `region` | `AWS_DEFAULT_REGION` / `us-east-1` | AWS region |
-| `instanceType` | `t4g.medium` | EC2 instance type |
-| `arch` | `arm64` | AMI architecture (`arm64` or `amd64`) |
-| `sshCidr` | `0.0.0.0/0` | CIDR allowed for SSH ingress |
+| Field          | Default                            | Description                           |
+| -------------- | ---------------------------------- | ------------------------------------- |
+| `region`       | `AWS_DEFAULT_REGION` / `us-east-1` | AWS region                            |
+| `instanceType` | `t4g.medium`                       | EC2 instance type                     |
+| `arch`         | `arm64`                            | AMI architecture (`arm64` or `amd64`) |
+| `sshCidr`      | `0.0.0.0/0`                        | CIDR allowed for SSH ingress          |
 
 Ubuntu AMI IDs are resolved automatically via SSM Parameter Store (`/aws/service/canonical/...`).
 
@@ -41,7 +41,10 @@ Ubuntu AMI IDs are resolved automatically via SSM Parameter Store (`/aws/service
 ```ts
 import { createEc2Provider } from "@inputforge/sandboxctl-ec2";
 
-const provider = createEc2Provider();
+const provider = createEc2Provider(
+  { region: "us-east-1", instanceType: "t4g.medium", sshCidr: "0.0.0.0/0" },
+  "arm64"
+);
 ```
 
 ## License
