@@ -41,7 +41,13 @@ export class SandboxProcess extends EventEmitter<SandboxProcessEvents> {
           this.emit("exit", this.exitCode);
         });
         channel.on("error", (error: Error) => {
-          this.emit("error", error);
+          stdout.end();
+          stderr.end();
+          this.exitCode = 1;
+          this.emit("exit", 1);
+          process.nextTick(() => {
+            this.emit("error", error);
+          });
         });
       } catch (error) {
         stdout.end();

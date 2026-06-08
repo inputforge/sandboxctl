@@ -7,12 +7,12 @@
     "packages/qemu",
     "packages/vmm",
     "packages/sdk",
-    "packages/cli"
+    "apps/cli"
   ],
   "type": "module",
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "cli": "node packages/cli/dist/index.js",
+    "cli": "node apps/cli/dist/index.js",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "prepare": "lefthook install"
