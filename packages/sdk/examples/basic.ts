@@ -22,8 +22,10 @@ const sandbox = new Sandbox({
 
 await sandbox.start();
 
-const { stdout, exitCode } = await sandbox.exec("node --version && uname -a");
-console.log("exit:", exitCode);
-console.log(stdout.trim());
-
-await sandbox.stop();
+try {
+  const { stdout, exitCode } = await sandbox.exec("node --version && uname -a");
+  console.log("exit:", exitCode);
+  console.log(stdout.trim());
+} finally {
+  await sandbox.stop();
+}

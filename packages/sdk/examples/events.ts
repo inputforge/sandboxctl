@@ -37,8 +37,17 @@ sandbox.on("log", (line) => {
 });
 
 // Progress ticks — suitable for a progress bar library
+let runningTotal = 0;
+let currentTotal: number | undefined;
 sandbox.on("progress", ({ label, delta, total, status }) => {
-  const pct = total ? Math.round((delta / total) * 100) : "?";
+  if (total !== undefined) {
+    runningTotal = 0;
+    currentTotal = total;
+  }
+  runningTotal += delta;
+  const pct = currentTotal
+    ? Math.round((runningTotal / currentTotal) * 100)
+    : "?";
   process.stdout.write(
     `\r  ${label}: ${pct}%${status ? ` (${status})` : ""}   `
   );
@@ -48,7 +57,9 @@ console.log("Starting sandbox (first boot may take a few minutes)...");
 await sandbox.start();
 console.log("\nSandbox is ready.");
 
-const { stdout } = await sandbox.exec("node --version && python3 --version");
-console.log(stdout.trim());
-
-await sandbox.stop();
+try {
+  const { stdout } = await sandbox.exec("node --version && python3 --version");
+  console.log(stdout.trim());
+} finally {
+  await sandbox.stop();
+}

@@ -110,8 +110,8 @@ export function createHostVerifier(
       if (mode === "strict") {
         console.error(
           `[sandboxctl] Strict host verification: no stored key for "${sandboxName}". ` +
-            `Connect once with mode "tofu" to register the key, or run:\n` +
-            `  ssh-keygen -R ${sandboxName} -f ${storePath}`
+            `Connect once with mode "tofu" to register the key, or add it manually with:\n` +
+            `  ssh-keyscan <host> >> ${storePath}`
         );
         return false;
       }
